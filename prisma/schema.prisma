@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  keywords       Keyword[]
+  subreddits     Subreddit[]
+  collectionRuns CollectionRun[]
+  chatMessages   ChatMessage[]
+  searchQueries  SearchQuery[]
+}
+
+model Keyword {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  type      String   // "brand" | "competitor" | "topic"
+  value     String
+  aliases   String   @default("[]") // JSON array of alias strings
+  createdAt DateTime @default(now())
+
+  postKeywords PostKeyword[]
+
+  @@index([companyId])
+}
+
+model Subreddit {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model SearchQuery {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  query     String
+  isCustom  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model RedditPost {
+  id        String   @id @default(cuid())
+  redditId  String   @unique
+  title     String
+  body      String   @default("")
+  subreddit String
+  author    String
+  url       String
+  permalink String
+  redditScore  Int   @default(0)
+  numComments  Int   @default(0)
+  isSelf       Boolean @default(true)
+  redditCreatedAt DateTime
+
+  // Classification results
+  isRelevant     Boolean? // null = not yet classified
+  relevanceScore Float?   // Jev noul 0-1
+  category       String?  // complaint | bug_report | product_idea | praise | recommendation_ask | other
+  categoryConfidence Float?
+  sentiment      String?  // positive | negative | neutral
+  sentimentConfidence Float?
+  urgency        Int?     // 1-5
+  urgencyRaw     Float?   // Jev score 0-4
+  reason         String?  // GPT-4o-mini one-liner
+
+  // Status
+  status    String @default("pending") // pending | new | handled | dismissed
+  classifiedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  postKeywords PostKeyword[]
+
+  @@index([status])
+  @@index([isRelevant])
+  @@index([category])
+  @@index([urgency])
+  @@index([redditCreatedAt])
+}
+
+model PostKeyword {
+  id        String     @id @default(cuid())
+  postId    String
+  post      RedditPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  keywordId String
+  keyword   Keyword    @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, keywordId])
+  @@index([postId])
+  @@index([keywordId])
+}
+
+model CollectionRun {
+  id          String    @id @default(cuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  status      String    @default("running") // running | completed | failed
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  totalFetched    Int @default(0)
+  totalNew        Int @default(0)
+  totalClassified Int @default(0)
+  totalRelevant   Int @default(0)
+  totalFiltered   Int @default(0)
+  errorCount      Int @default(0)
+
+  logs CollectionLog[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model CollectionLog {
+  id        String        @id @default(cuid())
+  runId     String
+  run       CollectionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  timestamp DateTime      @default(now())
+  type      String        // info | fetch | classify | summarize | error
+  message   String
+
+  @@index([runId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role      String   // user | assistant | system
+  content   String
+  metadata  String?  // JSON for config snapshots, errors, etc.
+  createdAt DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model AppSettings {
+  id                      String @id @default("default")
+  collectionIntervalMins  Int    @default(30)
+  relevanceThreshold      Float  @default(0.6)
+  isOnboardingComplete    Boolean @default(false)
+  activeCompanyId         String?
+}
