@@ -10,6 +10,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { PostCard, type PostData } from "@/components/organisms/PostCard";
 import { CategoryBreakdown } from "@/components/organisms/CategoryBreakdown";
 import { ActivityLog } from "@/components/organisms/ActivityLog";
+import { KeywordSection } from "@/components/organisms/KeywordSection";
+import { ConfigReviewCard } from "@/components/organisms/ConfigReviewCard";
 import { EmptyState } from "@/components/atoms";
 
 // ---------------------------------------------------------------------------
@@ -266,6 +268,89 @@ describe("CategoryBreakdown", () => {
 // ---------------------------------------------------------------------------
 // ActivityLog
 // ---------------------------------------------------------------------------
+describe("ConfigReviewCard other names", () => {
+  const props = {
+    config: {
+      companyName: "QuickBooks",
+      brandKeywords: [{ value: "QuickBooks", aliases: ["Quick Books"] }],
+      competitorKeywords: [],
+      topicKeywords: [],
+    },
+    subreddits: [],
+    onToggleSubreddit: vi.fn(),
+    onAddSubreddit: vi.fn(),
+    onAddCompetitor: vi.fn(),
+    onRemoveCompetitor: vi.fn(),
+    onAddTopic: vi.fn(),
+    onRemoveTopic: vi.fn(),
+    onConfirm: vi.fn(),
+    isSaving: false,
+  };
+
+  it("adds and removes another name for the brand", () => {
+    const onAddAlias = vi.fn();
+    const onRemoveAlias = vi.fn();
+    render(<ConfigReviewCard {...props} onAddAlias={onAddAlias} onRemoveAlias={onRemoveAlias} />);
+
+    const input = screen.getByPlaceholderText("Add another name for QuickBooks");
+    fireEvent.change(input, { target: { value: "QBO" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onAddAlias).toHaveBeenCalledWith("QuickBooks", "QBO");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Quick Books" }));
+    expect(onRemoveAlias).toHaveBeenCalledWith("QuickBooks", "Quick Books");
+  });
+});
+
+describe("KeywordSection other names", () => {
+  const brand = { id: "b1", value: "QuickBooks", aliases: '["QBO"]' };
+  const rival = { id: "c1", value: "Xero", aliases: "[]" };
+  const base = { brands: [brand], competitors: [rival], topics: [], onDeleteKeyword: vi.fn(), onAddKeyword: vi.fn() };
+
+  it("adds a name to a brand and to a competitor, keeping existing ones", () => {
+    const onChangeAliases = vi.fn();
+    render(<KeywordSection {...base} onChangeAliases={onChangeAliases} />);
+
+    const add = (keyword: string, name: string) => {
+      fireEvent.change(screen.getByPlaceholderText(`Add another name for ${keyword}`), { target: { value: name } });
+      fireEvent.keyDown(screen.getByPlaceholderText(`Add another name for ${keyword}`), { key: "Enter" });
+    };
+    add("QuickBooks", "Quick Books");
+    add("Xero", "Xero Accounting");
+
+    expect(onChangeAliases).toHaveBeenCalledWith("b1", ["QBO", "Quick Books"]);
+    expect(onChangeAliases).toHaveBeenCalledWith("c1", ["Xero Accounting"]);
+  });
+
+  it("ignores a name it already has", () => {
+    const onChangeAliases = vi.fn();
+    render(<KeywordSection {...base} onChangeAliases={onChangeAliases} />);
+    const input = screen.getByPlaceholderText("Add another name for QuickBooks");
+
+    fireEvent.change(input, { target: { value: "qbo" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.change(input, { target: { value: "quickbooks" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onChangeAliases).not.toHaveBeenCalled();
+  });
+
+  it("removes one name", () => {
+    const onChangeAliases = vi.fn();
+    render(<KeywordSection {...base} onChangeAliases={onChangeAliases} />);
+    const row = screen.getByTestId("aliases-QuickBooks");
+
+    fireEvent.click(row.querySelector("button")!);
+
+    expect(onChangeAliases).toHaveBeenCalledWith("b1", []);
+  });
+
+  it("does not break on an older comma-free or damaged value", () => {
+    render(<KeywordSection {...base} brands={[{ ...brand, aliases: "not json" }]} onChangeAliases={vi.fn()} />);
+    expect(screen.getByTestId("aliases-QuickBooks")).toBeDefined();
+  });
+});
+
 describe("ActivityLog", () => {
   it("shows live events when collecting", () => {
     render(

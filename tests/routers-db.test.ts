@@ -101,6 +101,47 @@ describe("the first search of a new session", () => {
   });
 });
 
+describe("other names for a keyword", () => {
+  it("saves them and searches for them", async () => {
+    const keyword = await db.keyword.create({ data: { companyId, type: "brand", value: "QuickBooks" } });
+
+    await settings().updateKeyword({ id: keyword.id, aliases: ["Quick Books"] });
+
+    expect((await db.keyword.findUniqueOrThrow({ where: { id: keyword.id } })).aliases).toBe('["Quick Books"]');
+    const queries = await db.searchQuery.findMany({ where: { companyId } });
+    expect(queries.some((row) => row.query.includes("Quick Books"))).toBe(true);
+  });
+
+  it("stops searching for a removed name", async () => {
+    const keyword = await db.keyword.create({ data: { companyId, type: "brand", value: "QuickBooks", aliases: '["Quick Books"]' } });
+
+    await settings().updateKeyword({ id: keyword.id, aliases: [] });
+
+    const queries = await db.searchQuery.findMany({ where: { companyId } });
+    expect(queries.some((row) => row.query.includes("Quick Books"))).toBe(false);
+  });
+});
+
+describe("other names set during setup", () => {
+  it("saves them, and searches for them, for a brand and a competitor", async () => {
+    const { companyId: created } = await onboarding().saveConfig({
+      companyName: "Deskly",
+      product: "standing desks",
+      keepWhen: "people choosing a desk",
+      brandKeywords: [{ value: "Deskly", aliases: ["Desk Ly"] }],
+      competitorKeywords: [{ value: "Uplift", aliases: ["Uplift Desk"] }],
+      topicKeywords: [],
+      subreddits: [],
+    });
+
+    const keywords = await db.keyword.findMany({ where: { companyId: created } });
+    expect(keywords.find((row) => row.value === "Deskly")?.aliases).toBe('["Desk Ly"]');
+    expect(keywords.find((row) => row.value === "Uplift")?.aliases).toBe('["Uplift Desk"]');
+    const all = (await db.searchQuery.findMany({ where: { companyId: created } })).map((row) => row.query).join(" ");
+    expect(all).toContain("Desk Ly");
+  });
+});
+
 describe("what counts as relevant", () => {
   it("means the same on the dashboard and the sidebar, and held posts count on their own", async () => {
     await savePost("shown", { isRelevant: true, status: "new" });

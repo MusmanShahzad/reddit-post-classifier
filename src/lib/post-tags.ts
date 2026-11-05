@@ -43,9 +43,13 @@ export function namesInQuery(
   ]);
 }
 
-/** A very short alias such as "QB" also means other things, so it never proves a match. */
+/**
+ * A two-letter alias such as "QB" also means other things, so it is not searched
+ * and never proves a match. Jev still reads it when judging a post. A three-letter
+ * name such as "QBO" is usually deliberate, and Jev filters out any off-topic posts.
+ */
 export function isSearchableAlias(alias: string): boolean {
-  return alias.trim().length > 3;
+  return alias.trim().length >= 3;
 }
 
 /**

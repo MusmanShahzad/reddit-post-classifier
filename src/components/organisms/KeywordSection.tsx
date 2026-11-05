@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { RemovableTag } from "@/components/atoms";
 import { TagList } from "@/components/molecules";
 import { AddItemInput } from "@/components/molecules";
+import { aliasList } from "@/lib/post-tags";
 
 /**
  * Settings section managing brand keywords, competitors, and topics.
@@ -13,6 +15,7 @@ import { AddItemInput } from "@/components/molecules";
  * @param topics       - Array of topic keyword objects.
  * @param onDeleteKeyword - Called with keyword ID to delete.
  * @param onAddKeyword    - Called with type and value to add.
+ * @param onChangeAliases - Called with keyword ID and its full new list of other names.
  *
  * @example
  * ```tsx
@@ -37,6 +40,41 @@ export interface KeywordSectionProps {
   topics: KeywordData[];
   onDeleteKeyword: (id: string) => void;
   onAddKeyword: (type: "brand" | "competitor" | "topic", value: string) => void;
+  onChangeAliases?: (id: string, aliases: string[]) => void;
+}
+
+/** The other names people use for one brand or competitor, each searched as well. */
+function AliasEditor({
+  keyword,
+  onChange,
+}: {
+  keyword: KeywordData;
+  onChange: (id: string, aliases: string[]) => void;
+}) {
+  const aliases = aliasList(keyword.aliases);
+  return (
+    <div className="flex flex-col gap-1.5" data-testid={`aliases-${keyword.value}`}>
+      <div className="flex flex-wrap items-center gap-1.5 text-sm">
+        <span className="font-medium">{keyword.value}</span>
+        {aliases.length === 0 && <span className="text-xs text-base-content/60">No other names yet</span>}
+        {aliases.map((alias) => (
+          <RemovableTag
+            key={alias}
+            label={alias}
+            variant="outline"
+            onRemove={() => onChange(keyword.id, aliases.filter((name) => name !== alias))}
+          />
+        ))}
+      </div>
+      <AddItemInput
+        placeholder={`Add another name for ${keyword.value}`}
+        onAdd={(name) => {
+          const known = [keyword.value, ...aliases].some((item) => item.toLowerCase() === name.toLowerCase());
+          if (!known) onChange(keyword.id, [...aliases, name]);
+        }}
+      />
+    </div>
+  );
 }
 
 export function KeywordSection({
@@ -45,7 +83,9 @@ export function KeywordSection({
   topics,
   onDeleteKeyword,
   onAddKeyword,
+  onChangeAliases,
 }: KeywordSectionProps) {
+  const named = [...brands, ...competitors];
   return (
     <div className="card card-border bg-base-100">
       <div className="card-body">
@@ -53,10 +93,7 @@ export function KeywordSection({
       <TagList
         tags={brands.map((kw) => ({
           label: kw.value,
-          sublabel:
-            JSON.parse(kw.aliases).length > 0
-              ? `(${(JSON.parse(kw.aliases) as string[]).join(", ")})`
-              : undefined,
+          sublabel: aliasList(kw.aliases).length > 0 ? `(${aliasList(kw.aliases).join(", ")})` : undefined,
           onRemove: () => onDeleteKeyword(kw.id),
         }))}
       />
@@ -67,6 +104,7 @@ export function KeywordSection({
       <TagList
         tags={competitors.map((kw) => ({
           label: kw.value,
+          sublabel: aliasList(kw.aliases).length > 0 ? `(${aliasList(kw.aliases).join(", ")})` : undefined,
           variant: "secondary" as const,
           onRemove: () => onDeleteKeyword(kw.id),
         }))}
@@ -86,6 +124,22 @@ export function KeywordSection({
       <div className="divider" />
 
       <KeywordAdder onAddKeyword={onAddKeyword} />
+
+      {onChangeAliases && named.length > 0 && (
+        <>
+          <div className="divider" />
+          <h3 className="card-title text-base">Other names</h3>
+          <p className="text-sm text-base-content/70">
+            Spellings and short names people use, such as &quot;QBO&quot; for QuickBooks Online. Changing them updates the
+            searches and how posts are judged. Two-letter names are too ambiguous to search, so they are only used when judging a post.
+          </p>
+          <div className="flex flex-col gap-4">
+            {named.map((keyword) => (
+              <AliasEditor key={keyword.id} keyword={keyword} onChange={onChangeAliases} />
+            ))}
+          </div>
+        </>
+      )}
       </div>
     </div>
   );

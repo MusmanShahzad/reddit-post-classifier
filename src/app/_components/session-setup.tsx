@@ -229,6 +229,28 @@ export function SessionSetup({ embedded = false, onCancel, onDone }: SessionSetu
   const removeNamed = (key: "competitorKeywords" | "topicKeywords", value: string) =>
     changeList(key, (list) => list.filter((item) => item.value !== value));
 
+  const changeAliases = (brandValue: string, change: (aliases: string[]) => string[]) => {
+    setConfig((current) => {
+      if (!current) return current;
+      const updated = {
+        ...current,
+        brandKeywords: current.brandKeywords.map((brand) =>
+          brand.value === brandValue ? { ...brand, aliases: change(brand.aliases) } : brand,
+        ),
+      };
+      knownRef.current = updated;
+      return updated;
+    });
+  };
+
+  const addAlias = (brandValue: string, alias: string) =>
+    changeAliases(brandValue, (aliases) =>
+      [brandValue, ...aliases].some((name) => name.toLowerCase() === alias.toLowerCase()) ? aliases : [...aliases, alias],
+    );
+
+  const removeAlias = (brandValue: string, alias: string) =>
+    changeAliases(brandValue, (aliases) => aliases.filter((name) => name !== alias));
+
   const startOver = () => {
     knownRef.current = null;
     summaryRef.current = "";
@@ -346,6 +368,8 @@ export function SessionSetup({ embedded = false, onCancel, onDone }: SessionSetu
             onRemoveCompetitor={(value) => removeNamed("competitorKeywords", value)}
             onAddTopic={(value) => addNamed("topicKeywords", value)}
             onRemoveTopic={(value) => removeNamed("topicKeywords", value)}
+            onAddAlias={addAlias}
+            onRemoveAlias={removeAlias}
             onConfirm={() => void handleSave(config)}
             onStartOver={startOver}
             isSaving={saveConfig.isPending}

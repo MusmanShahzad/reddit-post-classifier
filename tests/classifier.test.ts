@@ -65,6 +65,35 @@ beforeEach(() => {
   systemOne.mockResolvedValue({ answers: answers() });
 });
 
+describe("other names in what Jev reads", () => {
+  const withNames = {
+    ...input,
+    goals: ["own_feedback", "competitor_feedback"] as ("own_feedback" | "competitor_feedback")[],
+    keywords: [
+      { type: "brand", value: "QuickBooks", aliases: '["QBO", "QB"]' },
+      { type: "competitor", value: "Xero", aliases: '["Xero Accounting"]' },
+    ],
+  };
+
+  it("names the brand's other names, including two-letter ones, in the brand question", async () => {
+    await classifyPost(withNames);
+    const brand = sentRequest().questions.about_brand!.instructions;
+    expect(brand).toContain("QBO");
+    expect(brand).toContain("QB");
+  });
+
+  it("names a competitor's other names in the competitor question", async () => {
+    await classifyPost(withNames);
+    expect(sentRequest().questions.about_competitor!.instructions).toContain("Xero Accounting");
+  });
+
+  it("keeps a mention of another name deep inside a long post", async () => {
+    const long = `${"a ".repeat(1500)} the QBO bank feed broke ${"b ".repeat(1500)}`;
+    await classifyPost({ ...withNames, body: long });
+    expect(sentRequest().state).toContain("QBO");
+  });
+});
+
 describe("what is sent to Jev", () => {
   it("asks one question per rule in a single call", async () => {
     await classifyPost(input);

@@ -9,6 +9,41 @@ import {
 
 const BUYING = " (recommend OR recommendation OR alternative OR alternatives OR switch OR switching OR best OR which OR looking)";
 
+describe("other names in searches", () => {
+  const goals = (...list: Array<"own_feedback" | "competitor_feedback" | "potential_clients">) => list;
+
+  it("searches a brand's other names, for every goal", () => {
+    const keywords = [{ type: "brand", value: "QuickBooks", aliases: ["Quick Books", "QBO"] }];
+    expect(buildSearchQueries(keywords, goals("potential_clients"))[0]).toBe('"QuickBooks" OR "Quick Books" OR "QBO"');
+    expect(buildSearchQueries(keywords, goals("own_feedback"))[0]).toBe(
+      'title:"QuickBooks" OR title:"Quick Books" OR title:"QBO" OR subreddit:QuickBooks',
+    );
+  });
+
+  it("searches a competitor's other names", () => {
+    const keywords = [
+      { type: "brand", value: "Acme", aliases: [] },
+      { type: "competitor", value: "Shopmonkey", aliases: ["Shop Monkey", "SMK"] },
+    ];
+    const all = buildSearchQueries(keywords, goals("competitor_feedback")).join(" ");
+    expect(all).toContain('"Shop Monkey"');
+    expect(all).toContain('"SMK"');
+  });
+
+  it("keeps the niche beside the other names of an ambiguous brand", () => {
+    const keywords = [
+      { type: "brand", value: "Article", aliases: ["Article Home"], ambiguous: true },
+      { type: "topic", value: "wall art", aliases: [] },
+    ];
+    expect(buildSearchQueries(keywords, goals("potential_clients"))[0]).toBe('("Article" OR "Article Home") ("wall art")');
+  });
+
+  it("does not search a two-letter name", () => {
+    const keywords = [{ type: "brand", value: "QuickBooks", aliases: ["QB"] }];
+    expect(buildSearchQueries(keywords, goals("potential_clients")).join(" ")).not.toContain('"QB"');
+  });
+});
+
 describe("withoutBuyingWords", () => {
   it("removes the buying words and the brackets they needed", () => {
     expect(withoutBuyingWords(`("a b" OR "c d")${BUYING}`)).toBe('"a b" OR "c d"');

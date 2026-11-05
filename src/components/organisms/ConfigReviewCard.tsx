@@ -42,6 +42,9 @@ export interface ConfigReviewCardProps {
   onRemoveCompetitor: (value: string) => void;
   onAddTopic: (value: string) => void;
   onRemoveTopic: (value: string) => void;
+  /** Adds another name for a brand. */
+  onAddAlias?: (brand: string, alias: string) => void;
+  onRemoveAlias?: (brand: string, alias: string) => void;
   onConfirm: () => void;
   /** Goes back to the details form. */
   onStartOver?: () => void;
@@ -57,6 +60,8 @@ export function ConfigReviewCard({
   onRemoveCompetitor,
   onAddTopic,
   onRemoveTopic,
+  onAddAlias,
+  onRemoveAlias,
   onConfirm,
   onStartOver,
   isSaving,
@@ -68,7 +73,6 @@ export function ConfigReviewCard({
     { label: "Buyers", value: config.buyer },
     { label: "Skip", value: config.notAbout },
   ].filter((row) => row.value?.trim());
-  const brands = config.brandKeywords.flatMap((brand) => [brand.value, ...brand.aliases]);
   const picked = subreddits.filter((sub) => sub.selected).length;
 
   return (
@@ -88,21 +92,22 @@ export function ConfigReviewCard({
               <dd className="font-medium">{row.value}</dd>
             </div>
           ))}
-          {brands.length > 0 && (
-            <div className="contents">
-              <dt className="text-base-content/60">Brand names</dt>
-              <dd className="flex flex-wrap gap-1">
-                {brands.map((name) => (
-                  <span key={name} className="badge badge-ghost">
-                    {name}
-                  </span>
-                ))}
-              </dd>
-            </div>
-          )}
         </dl>
 
         <div className="divider my-0" />
+
+        {config.brandKeywords.map((brand) => (
+          <KeywordEditor
+            key={brand.value}
+            label={`Other names for ${brand.value}`}
+            hint="Spellings and short names people use. Each one is searched as well."
+            empty="No other names yet."
+            placeholder={`Add another name for ${brand.value}`}
+            values={brand.aliases}
+            onAdd={(value) => onAddAlias?.(brand.value, value)}
+            onRemove={(value) => onRemoveAlias?.(brand.value, value)}
+          />
+        ))}
 
         <KeywordEditor
           label="Competitors"

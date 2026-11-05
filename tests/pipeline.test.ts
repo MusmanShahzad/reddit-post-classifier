@@ -569,6 +569,51 @@ describe("widening an empty topic search", () => {
   });
 });
 
+describe("other names of a keyword", () => {
+  beforeEach(async () => {
+    await db.searchQuery.deleteMany();
+    await db.searchQuery.create({ data: { companyId, query: '"Beta" OR "BTA"' } });
+    await db.keyword.create({ data: { companyId, type: "competitor", value: "Beta", aliases: '["BTA"]' } });
+  });
+
+  it("keeps a post that uses only the other name, and drops one that uses neither", async () => {
+    results = {
+      '"Beta" OR "BTA"': [
+        post("a1", "BTA keeps crashing", { selftext: "" }),
+        post("a2", "Nothing relevant here", { selftext: "" }),
+      ],
+    };
+
+    await collect();
+
+    expect((await db.redditPost.findMany()).map((row) => row.redditId)).toEqual(["a1"]);
+    const row = search(await latestRun(), '"Beta" OR "BTA"');
+    expect(row).toMatchObject({ fetchedCount: 2, newCount: 1 });
+    expect(droppedPosts(row)).toBe(1);
+  });
+
+  it("tags that post with the keyword, and passes the other name to the classifier", async () => {
+    results = { '"Beta" OR "BTA"': [post("a1", "BTA keeps crashing", { selftext: "" })] };
+
+    await collect();
+
+    const saved = await db.redditPost.findFirstOrThrow({ include: { postKeywords: { include: { keyword: true } } } });
+    expect(saved.postKeywords.map((link) => link.keyword.value)).toEqual(["Beta"]);
+    const sent = mocks.classifyPost.mock.calls[0]?.[0] as { keywords: { value: string; aliases: string }[] };
+    expect(sent.keywords.find((keyword) => keyword.value === "Beta")?.aliases).toBe('["BTA"]');
+  });
+
+  it("uses a name added later on the very next run", async () => {
+    await db.keyword.updateMany({ where: { value: "Beta" }, data: { aliases: '["BTA", "Beta Co"]' } });
+    results = { '"Beta" OR "BTA"': [post("a1", "BTA keeps crashing", { selftext: "" })] };
+
+    await collect();
+
+    const sent = mocks.classifyPost.mock.calls[0]?.[0] as { keywords: { value: string; aliases: string }[] };
+    expect(sent.keywords.find((keyword) => keyword.value === "Beta")?.aliases).toContain("Beta Co");
+  });
+});
+
 describe("the limit on posts per search", () => {
   afterEach(() => {
     collectorConfig.maxPostsPerSearch = 100;

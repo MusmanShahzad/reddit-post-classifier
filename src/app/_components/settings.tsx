@@ -24,6 +24,7 @@ export function Settings() {
   };
   const addKeyword = api.settings.addKeyword.useMutation({ onSuccess: refresh });
   const deleteKeyword = api.settings.deleteKeyword.useMutation({ onSuccess: refresh });
+  const updateKeyword = api.settings.updateKeyword.useMutation({ onSuccess: refresh });
   const addSubreddit = api.settings.addSubreddit.useMutation({ onSuccess: refresh });
   const removeSubreddit = api.settings.removeSubreddit.useMutation({ onSuccess: refresh });
   const addCustomQuery = api.settings.addCustomQuery.useMutation({ onSuccess: refresh });
@@ -31,6 +32,7 @@ export function Settings() {
   const editError = readableError(
     addKeyword.error ??
       deleteKeyword.error ??
+      updateKeyword.error ??
       addSubreddit.error ??
       removeSubreddit.error ??
       addCustomQuery.error ??
@@ -97,6 +99,7 @@ export function Settings() {
         onAddKeyword={(type, value) =>
           addKeyword.mutate({ companyId: company.id, type, value })
         }
+        onChangeAliases={(id, aliases) => updateKeyword.mutate({ id, aliases })}
       />
 
       <SubredditSection

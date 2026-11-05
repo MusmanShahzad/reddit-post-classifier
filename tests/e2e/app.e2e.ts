@@ -569,6 +569,29 @@ describe("scheduling and session badges", () => {
   });
 });
 
+describe("keywords", () => {
+  it("adds and removes another name from Settings, and the searches follow", async () => {
+    await open("Settings");
+    const input = page.getByPlaceholder("Add another name for Acme");
+
+    await input.fill("Acme Corp");
+    await input.press("Enter");
+
+    const row = page.getByTestId("aliases-Acme");
+    await expect(row).toContainText("Acme Corp", { timeout: 5_000 });
+    await expect
+      .poll(async () => (await db.searchQuery.findMany({ where: { companyId } })).some((item) => item.query.includes("Acme Corp")), { timeout: 5_000 })
+      .toBe(true);
+
+    await page.reload();
+    await nav("Settings").click();
+    await expect(page.getByTestId("aliases-Acme")).toContainText("Acme Corp");
+
+    await page.getByTestId("aliases-Acme").locator("button").first().click();
+    await expect(page.getByTestId("aliases-Acme")).not.toContainText("Acme Corp", { timeout: 5_000 });
+  });
+});
+
 describe("failures", () => {
   it("says so when the server cannot be reached, and recovers", async () => {
     await open("Dashboard");
