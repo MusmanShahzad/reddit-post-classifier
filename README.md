@@ -61,7 +61,7 @@ Open [http://localhost:3000](http://localhost:3000). For development, use `npm r
 
 There are three ways, and you only need one:
 
-- **Wait for the schedule.** A new session collects automatically, and its first run starts within about 30 seconds. After that it runs every 30 minutes, which you can change in Settings.
+- **Do nothing.** Creating a session starts its first search straight away, and the schedule then runs it every 30 minutes. You can change the interval in Settings.
 - **Press Run collection** on the Dashboard.
 - **Call the endpoint.** This runs the session that is open:
 
@@ -75,7 +75,7 @@ Running it again does not create duplicates. Watch the progress on the Dashboard
 
 ## What it costs
 
-ScrapeBadger charges **8 credits per search that returns posts** (about 7 posts), nothing for a search that returns none, and **5 credits per author profile**. Settings shows the most your session can spend. To reduce it:
+ScrapeBadger charges **8 credits per search that returns posts**, nothing for a search that returns none, and **5 credits per author profile**. Settings shows the most your session can spend. To reduce it:
 
 - Raise the minutes between runs, or turn off **Collect automatically**.
 - Turn off **Include this session in the schedule** for sessions you only check now and then.
