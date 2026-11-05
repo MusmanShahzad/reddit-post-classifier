@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "eval": "vitest run --config vitest.eval.config.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

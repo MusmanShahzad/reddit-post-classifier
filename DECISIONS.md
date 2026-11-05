@@ -47,7 +47,21 @@ Which questions are asked depends on the session's goal. A post with a score of 
 - When the competitor rule was added, all 41 saved posts from four sessions were re-scored with real Jev. Six verdicts changed: four off-target FedEx and UPS posts and two hiring posts, which the user had already dismissed.
 - The Dashboard's filter quality card measures your own handle and dismiss decisions against the filter. It gives no score while nothing has reached the feed.
 
-**What was not checked:** we have no labelled test set, so **we have no measured precision or recall**. Treat the numbers above as a small manual sample. Building a labelled set is the first item under "What is next".
+**Measured against labelled posts.** We labelled 72 real posts from four markets, by asking whether that session's team would want each one. The labels were written from the post text before any score was seen, and they were then compared with the real classifier. "Kept" includes posts held for a check, and "in the feed" means shown without one.
+
+| Posts | Count | Wanted | Kept: precision | Kept: recall | In the feed: precision | In the feed: recall |
+|---|---|---|---|---|---|---|
+| **New, not seen during development** | 33 | 5 | 29% (5/17) | 100% (5/5) | 57% (4/7) | 80% (4/5) |
+| Seen during development | 39 | 10 | 83% (10/12) | 100% (10/10) | 100% (9/9) | 90% (9/10) |
+| All | 72 | 15 | 52% (15/29) | 100% (15/15) | 81% (13/16) | 87% (13/15) |
+
+- **Trust the first row most.** Several rules were written while looking at the second row's posts, so those numbers flatter the filter.
+- **The sample is small,** with only 15 wanted posts. One post moves the new-post figures by 14 to 20 points, so treat these as a rough guide.
+- **One AI assistant wrote the labels,** not an independent person, and it also helped build the filter. Nothing was tuned after seeing these results.
+- **Overall,** the filter stopped 54 of the 57 unwanted posts from reaching the feed, and it never skipped a wanted post. Its main weakness is sending too many unwanted posts to **Needs your check**. Those cost a person a moment but do not pollute the feed.
+- **Category** matched on 14 of the 15 wanted posts. The miss was an angry complaint about a broken promise, labelled as a bug report.
+- **The strictest test was the pharmacy courier market.** No post came from a pharmacy looking for a courier, so nothing should have been kept, but 4 of its 17 were, and 2 reached the feed. All 4 were people looking for medication delivery for themselves or a friend: on topic, but not the buyer.
+- **The labelled posts are not in this repo,** because they include personal details from people's posts, such as health information. `tests/eval/filter.eval.ts` is the measurement, and `npm run eval` reruns it on a file of your own.
 
 **Where it fails:**
 
@@ -93,7 +107,7 @@ Convert credits at your ScrapeBadger plan's rate. The search credits are by far 
 
 ## What is next
 
-1. **A labelled test set** of a few hundred posts, to measure precision and recall and to tune the thresholds.
+1. **A larger labelled set,** of a few hundred posts labelled by someone independent, with a held-back part, to tune the thresholds and tighten who counts as the buyer.
 2. **Login**, before the app is reachable from outside a private network.
 3. **Database migrations** instead of `prisma db push`, so schema changes can be reviewed and rolled back.
 4. **Dependency upgrades.** `npm audit` still reports issues in Next.js 15 and Zod 3 that need major version upgrades.

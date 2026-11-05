@@ -54,7 +54,7 @@ Open [http://localhost:3000](http://localhost:3000). For development, use `npm r
 ### 4. Set up what to track
 
 1. Enter the company name, what it sells, and what to find. Press **Continue**.
-2. On the review screen, check the brand names, competitors, topics and subreddits. Remove anything that does not fit, or add what is missing.
+2. On the review screen, check the brand's other names, competitors, topics and subreddits. Remove anything that does not fit, or add what is missing. You can change all of these later in Settings, including other names for competitors.
 3. Press **Start monitoring**.
 
 ### 5. Trigger a collection run
@@ -102,6 +102,7 @@ npm run typecheck
 ```
 
 - `npm test` runs the unit and database tests. It needs no keys and spends nothing.
+- `npm run eval` measures the filter against a file of labelled posts, using real Jev calls, so it needs your key. See `DECISIONS.md` for the results and the file's location.
 - `npm run test:e2e` builds the app and drives the production build in a real browser, including the real scheduler. It takes about 5 minutes and spends nothing, because ScrapeBadger, Jev and OpenAI are local stand-ins. If Chromium is missing, run `npx playwright install chromium`. Screenshots go to `e2e-artifacts/`.
 
 ## How it is built
