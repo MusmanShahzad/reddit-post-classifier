@@ -67,7 +67,7 @@ When a session names its buyer, a possible lead gets one more question: is the a
 | Seen during development | 39 | 10 | 100% (10/10) | 100% (10/10) | 100% (10/10) | 100% (10/10) |
 | All | 72 | 15 | 88–94% (15/17, 15/16) | 100% (15/15) | 100% (13/13) | 87% (13/15) |
 
-- **The second table is not a clean test.** Both changes came from studying the first table's errors, so all 72 posts now flatter the filter. Only a fresh set of labelled posts will show the real accuracy. The first table's top row is the last unbiased figure we have.
+- **The second table is not a clean test.** Both changes came from studying the first table's errors, so all 72 posts now flatter the filter. The fresh test below is the figure to trust.
 - **There is a cost.** Feed recall on the 33 posts fell from 80% to 60%. "Samsara duo dash cameras", a wanted post, is now held for a check instead of shown. It is not lost, but someone has to open it.
 - **A loosely worded buyer costs speed, not posts.** Using "autoleap owners" and similar wording, no wanted post was skipped, but feed recall across all 72 fell to 60% (9/15) because the rest were held. Kept precision on the 33 posts was 45% (5/11). So the buyer's wording matters.
 - **The sample is small,** with only 15 wanted posts. One post moves the 33-post figures by 14 to 33 points, so treat these as a rough guide.
@@ -75,6 +75,23 @@ When a session names its buyer, a possible lead gets one more question: is the a
 - **Jev's answers vary slightly between runs.** Across two runs with the same input, 32 of 72 scores changed, one by more than 0.1, and one post's decision changed. A post right on a line can land on either side.
 - **Category** matched on 14 of the 15 wanted posts. The miss was an angry complaint about a broken promise, labelled as a bug report.
 - **The strictest test was the pharmacy courier market.** No post came from a pharmacy looking for a courier, so nothing should have been kept. At first 4 of its 17 were, all from people looking for medication for themselves or a friend. With the buyer question, none were.
+**Fresh test, the most reliable figure we have.** After those changes, the filter was frozen and tested on 150 posts it had never seen, from eight markets, four of them new. The labelling rules were written before any post was fetched, and the labels were locked before any post was scored. Nothing was changed afterwards.
+
+| Posts | Count | Wanted | Kept: precision | Kept: recall | In the feed: precision | In the feed: recall |
+|---|---|---|---|---|---|---|
+| **All** | 150 | 28 | 61% (28/46) | 100% (28/28) | **71% (25/35)** | **89% (25/28)** |
+| Leaving out 9 unsure labels | 141 | 24 | 63% (24/38) | 100% (24/24) | 76% (22/29) | 92% (22/24) |
+| Four new markets | 113 | 19 | 56% (19/34) | 100% (19/19) | 67% (16/24) | 84% (16/19) |
+| Four earlier markets | 37 | 9 | 75% (9/12) | 100% (9/9) | 82% (9/11) | 100% (9/9) |
+
+- **What this means:** about 7 in 10 feed posts are worth acting on, and no wanted post was skipped. With a sample this size, the likely range for feed precision is about 55% to 84%, and for feed recall about 73% to 96% (95% intervals).
+- **Unwanted posts:** 112 of 122 stayed out of the feed.
+- **Category** matched on 23 of the 28 wanted posts.
+- **It is still not independent.** The AI assistant that helped build the filter wrote these labels, the briefs for the four new markets, and the buyers for six of the eight sessions.
+- **It is not a sample of a normal week.** To reach 150 posts, the searches also covered the past month and year, while scheduled runs search the past week. The 336 scraper credits ran out before the 200-post target.
+- **Some markets say little.** Jobber's posts held no wanted post at all, and AutoLeap, Motive and weel gave only 24 posts between them, with 1 wanted. Most of the evidence comes from QuickBooks, Gusto and Zendesk.
+- **The main errors in the feed:** plain how-to questions about a product, read as feedback (4 of the 10), and vendors' "I compared 7 tools" posts, read as buyers (2 of the 10). We have not tuned for these, so this result stays clean.
+
 - **The labelled posts are not in this repo,** because they include personal details from people's posts, such as health information. `tests/eval/filter.eval.ts` is the measurement, and `npm run eval` reruns it on a file of your own.
 
 **Where it fails:**
@@ -86,7 +103,8 @@ When a session names its buyer, a possible lead gets one more question: is the a
 | Quiet markets | Reddit may simply have few posts, so a session can correctly find almost nothing |
 | Posts about a competitor that are not feedback | Hiring and layoff posts are about the market, so they can still be kept |
 | Author's relationship to the product | Tags can be wrong: someone still using a product was tagged as a former customer |
-| Vendors and job adverts | They match a name search. The promotional question catches most but not all |
+| Vendors and job adverts | They match a name search. The promotional question catches most but not all. Vendors posing as reviewers ("I compared 7 tools") can reach the feed |
+| How-to questions | A plain question about using the product can be shown as feedback, even when the user asked only for complaints and reviews |
 | Short posts with no body | Too little text to judge, so they tend to be held or skipped |
 | Sarcasm and mixed feelings | One sentiment label is forced onto the whole post |
 | Wanted posts with no clear purpose | An unsure post labelled "other" is now skipped, so a useful one that fits no category is lost. None of the 15 wanted posts did this, but the sample is small |
@@ -122,7 +140,7 @@ Convert credits at your ScrapeBadger plan's rate. The search credits are by far 
 
 ## What is next
 
-1. **A larger labelled set,** of a few hundred new posts labelled by someone independent, with a held-back part, to get an unbiased accuracy figure and tune the thresholds.
+1. **Independent labels,** by having a person check the 150 fresh labels, then a further held-back set to measure any fix for how-to questions and vendor posts.
 2. **Login**, before the app is reachable from outside a private network.
 3. **Database migrations** instead of `prisma db push`, so schema changes can be reviewed and rolled back.
 4. **Dependency upgrades.** `npm audit` still reports issues in Next.js 15 and Zod 3 that need major version upgrades.
