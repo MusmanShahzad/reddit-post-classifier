@@ -1,3 +1,5 @@
+import { AnimatedNumber } from "./AnimatedValue";
+
 /**
  * A compact stat card displaying a label, numeric value, and optional icon.
  *
@@ -28,7 +30,9 @@ export function StatCard({ label, value, icon }: StatCardProps) {
           {icon}
           <span>{label}</span>
         </div>
-        <div className="stat-value text-2xl">{value}</div>
+        <div className="stat-value text-2xl">
+          <AnimatedNumber value={value} />
+        </div>
       </div>
     </div>
   );

@@ -28,7 +28,7 @@ describe("SessionSwitcher", () => {
   it("lists sessions with what each one looks for and marks the active one", () => {
     render(<SessionSwitcher sessions={sessions} activeId="a" {...handlers()} />);
     expect(screen.getByText("bad reviews")).toBeInTheDocument();
-    expect(screen.getByText("3 relevant · 40 saved")).toBeInTheDocument();
+    expect(screen.getByText("AutoLeap").closest("[aria-current]")).toHaveTextContent("3 relevant · 40 saved");
     expect(screen.getByText("AutoLeap").closest("[aria-current]")).toHaveAttribute("aria-current", "true");
   });
 

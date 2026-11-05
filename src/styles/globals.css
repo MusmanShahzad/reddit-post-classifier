@@ -21,6 +21,23 @@
   animation: rise-in 320ms ease-out both;
 }
 
+@keyframes text-change {
+  from {
+    opacity: 0.15;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A value that just changed. Only this text moves, not the panel around it. */
+.animate-text-change {
+  display: inline-block;
+  animation: text-change 260ms ease-out both;
+}
+
 @keyframes caret-blink {
   50% {
     opacity: 0;
@@ -65,6 +82,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise-in,
+  .animate-text-change,
   .stream-caret,
   .text-shimmer {
     animation: none;

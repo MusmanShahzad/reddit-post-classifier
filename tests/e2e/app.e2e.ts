@@ -603,6 +603,89 @@ describe("failures", () => {
     await expect(page.getByText("Cannot reach the server")).toBeHidden({ timeout: 30_000 });
   });
 
+  it("updates only the changed numbers, with no skeleton and no rebuilt panels", async () => {
+    await open("Dashboard");
+    const total = page.locator(".stat", { hasText: "Total Posts" }).locator(".stat-value");
+    await expect(total).toHaveText("0", { timeout: 15_000 });
+
+    await page.evaluate(() => {
+      const seen: string[] = [];
+      const value = [...document.querySelectorAll(".stat")].find((stat) => stat.textContent?.includes("Total Posts"))!;
+      value.setAttribute("data-kept", "yes");
+      const watch = window as unknown as { seenTotals: string[]; skeletons: number };
+      watch.seenTotals = seen;
+      watch.skeletons = 0;
+      new MutationObserver((changes) => {
+        seen.push(value.querySelector(".stat-value")?.textContent ?? "");
+        for (const change of changes) {
+          for (const node of change.addedNodes) {
+            if (node instanceof Element && (node.matches(".skeleton") || node.querySelector(".skeleton"))) watch.skeletons += 1;
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    });
+
+    await db.redditPost.createMany({
+      data: Array.from({ length: 30 }, (_, index) => ({
+        companyId,
+        redditId: `animated-${index}`,
+        title: `Acme post ${index}`,
+        subreddit: "acme",
+        author: "someone",
+        url: `https://reddit.com/${index}`,
+        permalink: `/r/acme/${index}`,
+        redditCreatedAt: new Date(),
+      })),
+    });
+
+    await expect(total).toHaveText("30", { timeout: 15_000 });
+    const result = await page.evaluate(() => {
+      const watch = window as unknown as { seenTotals: string[]; skeletons: number };
+      return { totals: watch.seenTotals, skeletons: watch.skeletons };
+    });
+    const between = result.totals.map(Number).filter((value) => value > 0 && value < 30);
+    expect(between.length, "the number should pass through values on its way to 30").toBeGreaterThan(0);
+    expect(result.skeletons).toBe(0);
+    await expect(page.locator(".stat[data-kept]")).toHaveCount(1);
+  });
+
+  it("keeps two tabs on different sessions, without either one refreshing", async () => {
+    const other = await seedSession("Other tab co");
+    await open("Dashboard");
+    const second = await browser.newPage();
+    try {
+      await second.goto(`${APP}/${other}`);
+      await expect(second.locator("h1", { hasText: "Other tab co" })).toBeVisible({ timeout: 15_000 });
+      const firstContent = page.locator(".animate-rise-in").first();
+      const secondContent = second.locator(".animate-rise-in").first();
+      await expect(firstContent).toBeVisible({ timeout: 15_000 });
+      await expect(secondContent).toBeVisible({ timeout: 15_000 });
+
+      // The opening switch has settled. A rebuilt panel loses this mark.
+      await page.waitForTimeout(1_000);
+      await firstContent.evaluate((node) => node.setAttribute("data-kept", "yes"));
+      await secondContent.evaluate((node) => node.setAttribute("data-kept", "yes"));
+      let switches = 0;
+      const countSwitches = (request: { url(): string }) => {
+        if (request.url().includes("session.switchTo")) switches += 1;
+      };
+      page.on("request", countSwitches);
+      second.on("request", countSwitches);
+
+      // Longer than two rounds of the 3-second session refresh.
+      await page.waitForTimeout(8_000);
+
+      expect(switches).toBe(0);
+      await expect(page.locator(".animate-rise-in[data-kept]")).toHaveCount(1);
+      await expect(second.locator(".animate-rise-in[data-kept]")).toHaveCount(1);
+      await expect(second.locator("h1", { hasText: "Other tab co" })).toBeVisible();
+      await expect(page.locator("h1", { hasText: "Other tab co" })).toBeHidden();
+      await expect(page).toHaveURL(new RegExp(companyId));
+    } finally {
+      await second.close();
+    }
+  });
+
   it("deletes a session after asking", async () => {
     const other = await seedSession("Delete me");
     await open("Dashboard");

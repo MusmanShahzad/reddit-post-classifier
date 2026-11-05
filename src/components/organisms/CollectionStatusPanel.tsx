@@ -1,4 +1,5 @@
 import { RefreshCw } from "lucide-react";
+import { AnimatedText } from "@/components/atoms";
 import { CollectionStats } from "@/components/molecules";
 
 /**
@@ -68,7 +69,7 @@ export function CollectionStatusPanel({
             {shownStatus === "running" && (
               <span className="loading loading-spinner loading-xs" />
             )}
-            {shownStatus}
+            <AnimatedText text={shownStatus ?? ""} />
           </span>
         )}
       </div>
@@ -105,16 +106,21 @@ export function CollectionStatusPanel({
       </button>
       {schedule && (
         <p className="text-sm text-base-content/70">
-          {schedule.autoCollectEnabled === false
-            ? "Automatic collection is off. Press Run collection to collect."
-            : `Runs ${schedule.intervalMins} min after the last one finishes.`}
-          {schedule.queued
-            ? " One run is waiting in the queue."
-            : schedule.autoCollectEnabled === false || isCollecting
-              ? ""
-              : new Date(schedule.nextRunAt).getTime() <= Date.now()
-                ? " The next run is due and will start in the background."
-                : ` Next run ${new Date(schedule.nextRunAt).toLocaleString()}.`}
+          <AnimatedText
+            text={`${
+              schedule.autoCollectEnabled === false
+                ? "Automatic collection is off. Press Run collection to collect."
+                : `Runs ${schedule.intervalMins} min after the last one finishes.`
+            }${
+              schedule.queued
+                ? " One run is waiting in the queue."
+                : schedule.autoCollectEnabled === false || isCollecting
+                  ? ""
+                  : new Date(schedule.nextRunAt).getTime() <= Date.now()
+                    ? " The next run is due and will start in the background."
+                    : ` Next run ${new Date(schedule.nextRunAt).toLocaleString()}.`
+            }`}
+          />
         </p>
       )}
       </div>

@@ -1,3 +1,5 @@
+import { AnimatedNumber, AnimatedText } from "@/components/atoms";
+
 /**
  * A two-column key/value grid showing stats from the last collection run.
  *
@@ -34,13 +36,13 @@ export function CollectionStats({
   return (
     <div className="grid grid-cols-2 gap-2 text-sm">
       <div className="text-base-content/60">Last run:</div>
-      <div className="font-medium">{new Date(startedAt).toLocaleString()}</div>
+      <div className="font-medium"><AnimatedText text={new Date(startedAt).toLocaleString()} /></div>
       <div className="text-base-content/60">Posts found:</div>
-      <div className="font-medium">{totalFetched}</div>
+      <div className="font-medium"><AnimatedNumber value={totalFetched} /></div>
       <div className="text-base-content/60">New posts:</div>
-      <div className="font-medium">{totalNew}</div>
+      <div className="font-medium"><AnimatedNumber value={totalNew} /></div>
       <div className="text-base-content/60" title="Passed the filter: in the feed, or held for your check">Kept:</div>
-      <div className="font-medium">{totalRelevant}</div>
+      <div className="font-medium"><AnimatedNumber value={totalRelevant} /></div>
     </div>
   );
 }

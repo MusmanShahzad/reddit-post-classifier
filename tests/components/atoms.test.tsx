@@ -6,8 +6,10 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import {
+  AnimatedNumber,
+  AnimatedText,
   Logo,
   StatCard,
   UrgencyBadge,
@@ -75,8 +77,34 @@ describe("StatCard", () => {
 
   it("renders the value in a stat", () => {
     render(<StatCard label="Relevant" value={10} icon="✅" />);
-    const valueEl = screen.getByText("10");
-    expect(valueEl.className).toContain("stat-value");
+    expect(screen.getByText("10").closest(".stat-value")).not.toBeNull();
+  });
+});
+
+describe("AnimatedNumber", () => {
+  it("shows the value at once on first render", () => {
+    render(<AnimatedNumber value={42} />);
+    expect(screen.getByText("42")).toBeInTheDocument();
+  });
+
+  it("reaches the new value, on the same element", async () => {
+    const { rerender } = render(<AnimatedNumber value={0} suffix="%" />);
+    const element = screen.getByText("0%");
+    rerender(<AnimatedNumber value={80} suffix="%" />);
+    await waitFor(() => expect(element).toHaveTextContent("80%"), { timeout: 4000 });
+  });
+});
+
+describe("AnimatedText", () => {
+  it("stays still until the text changes, then fades in the new text", () => {
+    const { rerender } = render(<AnimatedText text="running" />);
+    expect(screen.getByText("running").className).not.toContain("animate-text-change");
+
+    rerender(<AnimatedText text="running" />);
+    expect(screen.getByText("running").className).not.toContain("animate-text-change");
+
+    rerender(<AnimatedText text="completed" />);
+    expect(screen.getByText("completed").className).toContain("animate-text-change");
   });
 });
 

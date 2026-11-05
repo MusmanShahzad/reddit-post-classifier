@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { ShieldCheck } from "lucide-react";
+import { AnimatedNumber, AnimatedProgress, AnimatedText, useAnimatedNumber } from "@/components/atoms";
 import type { FilterQuality } from "@/lib/filter-checks";
 
 export interface FilterQualityCardProps {
@@ -19,6 +20,7 @@ function tone(value: number): string {
 /** How much the filter can be trusted, from saved posts and the user's own actions. */
 export function FilterQualityCard({ quality, reviewCount, onOpenReview, onCompleteBrief }: FilterQualityCardProps) {
   const score = quality?.score ?? null;
+  const shownScore = useAnimatedNumber(score ?? 0);
   const brief = quality?.metrics.find((metric) => metric.id === "brief");
   const briefOpen = brief?.value !== null && brief?.value !== undefined && brief.value < 1;
   return (
@@ -38,12 +40,12 @@ export function FilterQualityCard({ quality, reviewCount, onOpenReview, onComple
           {score !== null ? (
             <div
               className={`radial-progress shrink-0 text-sm font-semibold ${score >= 85 ? "text-success" : score >= 60 ? "text-warning" : "text-error"}`}
-              style={{ "--value": score, "--size": "4rem" } as CSSProperties}
+              style={{ "--value": shownScore, "--size": "4rem" } as CSSProperties}
               role="progressbar"
               aria-valuenow={score}
               aria-label="Filter quality score"
             >
-              {score}
+              <span className="tabular-nums">{Math.round(shownScore)}</span>
             </div>
           ) : (
             <span className="badge badge-ghost shrink-0">{quality?.warning ? "No score yet" : "No data yet"}</span>
@@ -62,18 +64,20 @@ export function FilterQualityCard({ quality, reviewCount, onOpenReview, onComple
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>{metric.label}</span>
                 <span className="font-medium tabular-nums">
-                  {metric.value === null ? "—" : `${Math.round(metric.value * 100)}%`}
+                  {metric.value === null ? "—" : <AnimatedNumber value={Math.round(metric.value * 100)} suffix="%" />}
                 </span>
               </div>
               {metric.value !== null && (
-                <progress
+                <AnimatedProgress
                   className={`progress h-1.5 w-full ${tone(metric.value)}`}
                   value={Math.round(metric.value * 100)}
                   max={100}
                 />
               )}
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-base-content/60">{metric.detail}</p>
+                <p className="text-xs text-base-content/60">
+                  <AnimatedText text={metric.detail} />
+                </p>
                 {metric.id === "brief" && briefOpen && onCompleteBrief && (
                   <button type="button" className="btn btn-xs" onClick={onCompleteBrief}>
                     Complete brief
@@ -87,7 +91,7 @@ export function FilterQualityCard({ quality, reviewCount, onOpenReview, onComple
         {reviewCount > 0 && (
           <div role="status" className="alert alert-warning alert-soft">
             <span>
-              {reviewCount} {reviewCount === 1 ? "post needs" : "posts need"} your check before they show in the feed.
+              <AnimatedNumber value={reviewCount} /> {reviewCount === 1 ? "post needs" : "posts need"} your check before they show in the feed.
             </span>
             {onOpenReview && (
               <button type="button" className="btn btn-sm" onClick={onOpenReview}>

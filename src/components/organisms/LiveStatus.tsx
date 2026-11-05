@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock3, WifiOff } from "lucide-react";
+import { AnimatedNumber, AnimatedProgress, AnimatedText } from "@/components/atoms";
 
 export interface LiveStatusProps {
   run?: {
@@ -61,7 +62,7 @@ export function LiveStatus({ run, pending = 0, rateLimited = 0, disconnected = f
   const searches = (run?.searches ?? []).filter((search) => search.status !== "skipped");
   const finished = searches.filter((search) => FINISHED.has(search.status)).length;
   const headline = waitingUntil
-    ? `Searches paused, continuing in ${countdown(waitingUntil.getTime() - now)}`
+    ? "Searches paused, continuing in"
     : queued
       ? "Waiting for a turn to collect"
       : finished < searches.length
@@ -86,14 +87,18 @@ export function LiveStatus({ run, pending = 0, rateLimited = 0, disconnected = f
               <span className="status status-info" />
             </span>
           )}
-          <span className="font-semibold">{headline}</span>
+          <span className="font-semibold">
+            <AnimatedText text={headline} />
+            {/* This moves every second, so it must not fade each time. */}
+            {waitingUntil && <span className="tabular-nums"> {countdown(waitingUntil.getTime() - now)}</span>}
+          </span>
           <span className="badge badge-ghost badge-sm">Live</span>
           <span className="flex flex-wrap gap-1.5 sm:ml-auto">
-            <span className="badge badge-sm badge-outline">{run?.totalNew ?? 0} new</span>
-            <span className="badge badge-sm badge-outline">{run?.totalClassified ?? 0} classified</span>
-            <span className="badge badge-sm badge-success">{run?.totalRelevant ?? 0} kept</span>
-            {pending > 0 && <span className="badge badge-sm badge-outline">{pending} waiting</span>}
-            {rateLimited > 0 && <span className="badge badge-sm badge-warning">{rateLimited} rate limited</span>}
+            <span className="badge badge-sm badge-outline"><AnimatedNumber value={run?.totalNew ?? 0} /> new</span>
+            <span className="badge badge-sm badge-outline"><AnimatedNumber value={run?.totalClassified ?? 0} /> classified</span>
+            <span className="badge badge-sm badge-success"><AnimatedNumber value={run?.totalRelevant ?? 0} /> kept</span>
+            {pending > 0 && <span className="badge badge-sm badge-outline"><AnimatedNumber value={pending} /> waiting</span>}
+            {rateLimited > 0 && <span className="badge badge-sm badge-warning"><AnimatedNumber value={rateLimited} /> rate limited</span>}
           </span>
         </div>
         {waitingUntil && run?.waitReason && (
@@ -102,7 +107,7 @@ export function LiveStatus({ run, pending = 0, rateLimited = 0, disconnected = f
           </p>
         )}
         {searches.length > 0 && (
-          <progress
+          <AnimatedProgress
             className={`progress h-1.5 w-full ${waitingUntil ? "progress-warning" : "progress-info"}`}
             value={finished}
             max={searches.length}

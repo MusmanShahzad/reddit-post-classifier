@@ -1,3 +1,4 @@
+import { AnimatedNumber, AnimatedProgress } from "@/components/atoms";
 import { CategoryIcon } from "@/components/icons";
 import { CATEGORY_LABELS, type Category } from "@/lib/types";
 
@@ -43,13 +44,13 @@ export function CategoryBreakdown({
             <span className="w-28 text-sm font-medium">
               {CATEGORY_LABELS[c.category as Category] ?? c.category}
             </span>
-            <progress
+            <AnimatedProgress
               className="progress flex-1"
               value={c.count}
               max={Math.max(totalRelevant, 1)}
             />
             <span className="w-12 text-right text-sm text-base-content/70">
-              {c.count}
+              <AnimatedNumber value={c.count} />
             </span>
           </div>
         ))}

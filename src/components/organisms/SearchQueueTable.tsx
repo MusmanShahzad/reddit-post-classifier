@@ -1,3 +1,4 @@
+import { AnimatedNumber, AnimatedText } from "@/components/atoms";
 import { droppedPosts } from "@/lib/search-stats";
 
 const STATUS_BADGE: Record<string, string> = {
@@ -71,15 +72,15 @@ export function SearchQueueTable({
                     <td>
                       <span className={`badge badge-sm gap-1 ${STATUS_BADGE[row.status] ?? "badge-ghost"}`}>
                         {row.status === "running" && <span className="loading loading-spinner size-3" aria-hidden />}
-                        {row.status}
+                        <AnimatedText text={row.status} />
                       </span>
                     </td>
-                    <td>{row.fetchedCount}</td>
-                    <td>{row.newCount}</td>
-                    <td>{row.duplicateCount}</td>
-                    <td>{droppedPosts(row)}</td>
-                    <td>{row.relevantCount}</td>
-                    <td>{row.filteredCount}</td>
+                    <td><AnimatedNumber value={row.fetchedCount} /></td>
+                    <td><AnimatedNumber value={row.newCount} /></td>
+                    <td><AnimatedNumber value={row.duplicateCount} /></td>
+                    <td><AnimatedNumber value={droppedPosts(row)} /></td>
+                    <td><AnimatedNumber value={row.relevantCount} /></td>
+                    <td><AnimatedNumber value={row.filteredCount} /></td>
                   </tr>
                 ))}
               </tbody>

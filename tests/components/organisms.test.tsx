@@ -409,7 +409,7 @@ describe("ActivityLog", () => {
         activity={[]}
       />,
     );
-    expect(screen.getByText("Connection failed").className).toContain("text-error");
+    expect(screen.getByText("Connection failed").closest(".text-error")).not.toBeNull();
   });
 
   it("groups by run, keeps older runs closed, and offers a Problems filter", () => {

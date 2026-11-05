@@ -1,6 +1,7 @@
 export { Logo, type LogoProps } from "./Logo";
 export { AuthorAvatar, type AuthorAvatarProps } from "./AuthorAvatar";
 export { ThemeToggle } from "./ThemeToggle";
+export { AnimatedNumber, AnimatedProgress, AnimatedText, useAnimatedNumber } from "./AnimatedValue";
 export { StatCard, type StatCardProps } from "./StatCard";
 export { UrgencyBadge, type UrgencyBadgeProps } from "./UrgencyBadge";
 export { CategoryBadge, type CategoryBadgeProps } from "./CategoryBadge";

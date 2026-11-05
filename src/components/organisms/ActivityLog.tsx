@@ -11,6 +11,7 @@ import {
   Sparkles,
   StickyNote,
 } from "lucide-react";
+import { AnimatedNumber, AnimatedText } from "@/components/atoms";
 import { activityRuns, type ActivityEntry, type ActivityItem, type ActivityKind, type ActivityRun, type ActivityTone } from "@/lib/activity";
 import { timeAgo } from "@/lib/types";
 
@@ -82,13 +83,15 @@ function Item({ item }: { item: ActivityItem }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
-          <p className={`min-w-0 text-sm font-medium ${item.tone === "error" ? "text-error" : ""}`}>{item.title}</p>
+          <p className={`min-w-0 text-sm font-medium ${item.tone === "error" ? "text-error" : ""}`}>
+            <AnimatedText text={item.title} />
+          </p>
           <time
             className="shrink-0 text-xs text-base-content/50"
             dateTime={item.timestamp.toISOString()}
             title={item.timestamp.toLocaleString()}
           >
-            {timeAgo(item.timestamp)}
+            <AnimatedText text={timeAgo(item.timestamp)} />
           </time>
         </div>
         {item.query && (
@@ -99,9 +102,9 @@ function Item({ item }: { item: ActivityItem }) {
         {item.detail && <p className="text-xs text-base-content/70">{item.detail}</p>}
         {item.chips && item.chips.length > 0 && (
           <div className="mt-1 flex flex-wrap gap-1">
-            {item.chips.map((chip) => (
-              <span key={chip} className="badge badge-ghost badge-xs">
-                {chip}
+            {item.chips.map((chip, index) => (
+              <span key={index} className="badge badge-ghost badge-xs">
+                <AnimatedText text={chip} />
               </span>
             ))}
           </div>
@@ -135,19 +138,19 @@ function Run({ run, open, live }: { run: ActivityRun; open: boolean; live: boole
         <span className="font-medium">{runTime(run.startedAt)}</span>
         {run.status && (
           <span className={`badge badge-xs gap-1 ${RUN_BADGE[run.status] ?? "badge-ghost"}`}>
-            {run.status === "running" ? "In progress" : run.status === "completed" ? "Finished" : run.status === "failed" ? "Failed" : "Queued"}
+            <AnimatedText text={run.status === "running" ? "In progress" : run.status === "completed" ? "Finished" : run.status === "failed" ? "Failed" : "Queued"} />
           </span>
         )}
-        {run.chips.map((chip) => (
-          <span key={chip} className="badge badge-ghost badge-xs">
-            {chip}
+        {run.chips.map((chip, index) => (
+          <span key={index} className="badge badge-ghost badge-xs">
+            <AnimatedText text={chip} />
           </span>
         ))}
         {run.problems > 0 && (
-          <span className="badge badge-warning badge-xs">{run.problems} to note</span>
+          <span className="badge badge-warning badge-xs"><AnimatedNumber value={run.problems} /> to note</span>
         )}
         <span className="ml-auto text-xs text-base-content/50 group-open:hidden">
-          {run.items.length} {run.items.length === 1 ? "event" : "events"}
+          <AnimatedNumber value={run.items.length} /> {run.items.length === 1 ? "event" : "events"}
         </span>
       </summary>
       <ul className="space-y-3 px-3 pb-3" {...(live ? { role: "log", "aria-live": "polite" as const } : {})}>
@@ -202,7 +205,7 @@ export function ActivityLog({ isCollecting, liveEvents, activity }: ActivityLogP
             ) : (
               <History className="size-4" aria-hidden />
             )}
-            {isCollecting ? "Live collection" : "Recent activity"}
+            <AnimatedText text={isCollecting ? "Live collection" : "Recent activity"} />
           </h3>
           {problems > 0 && (
             <div className="join" role="group" aria-label="Filter activity">

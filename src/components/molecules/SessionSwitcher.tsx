@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check, Plus, Radar, Trash2, X } from "lucide-react";
+import { AnimatedNumber, AnimatedText } from "@/components/atoms";
 
 /**
  * Sidebar list of monitoring sessions. Each session has its own brief,
@@ -100,7 +101,7 @@ export function SessionSwitcher({
                         title={`${session.newPosts} new relevant ${session.newPosts === 1 ? "post" : "posts"}`}
                         aria-label={`${session.newPosts} new`}
                       >
-                        {session.newPosts}
+                        <AnimatedNumber value={session.newPosts ?? 0} />
                       </span>
                     )}
                   </div>
@@ -108,12 +109,14 @@ export function SessionSwitcher({
                     <div className="line-clamp-2 text-xs opacity-70">{session.keepWhen}</div>
                   )}
                   <div className="text-xs opacity-60">
-                    {session.relevant} relevant{session.toCheck ? ` · ${session.toCheck} to check` : ""} · {session.posts} saved
+                    <AnimatedNumber value={session.relevant ?? 0} /> relevant
+                    {session.toCheck ? <> · <AnimatedNumber value={session.toCheck} /> to check</> : null}
+                    {" · "}<AnimatedNumber value={session.posts ?? 0} /> saved
                   </div>
                   {session.runState && (
                     <span className={`badge badge-xs mt-1 gap-1 ${RUN_BADGE[session.runState].style}`}>
                       {session.runState === "collecting" && <span className="loading loading-spinner size-2" aria-hidden />}
-                      {RUN_BADGE[session.runState].label}
+                      <AnimatedText text={RUN_BADGE[session.runState].label} />
                     </span>
                   )}
                 </div>
