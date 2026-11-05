@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chatSummary, cleanBrief, combineRelevance, declinesSkip, missingBrief, monitoringScope, postExcerpt, relevanceStatements, replyGuidance, starterIssue, urgencyWhenShown } from "@/lib/relevance";
+import { chatSummary, cleanBrief, combineRelevance, declinesSkip, leadBuyerScore, missingBrief, monitoringScope, postExcerpt, relevanceStatements, replyGuidance, starterIssue, urgencyWhenShown } from "@/lib/relevance";
 
 const keywords = [
   { type: "brand", value: "AutoLeap" },
@@ -92,14 +92,43 @@ describe("relevance statements", () => {
     expect(statements.about_market).toContain("chairs");
   });
 
-  it("does not make the buyer text a rule, since a loose answer rejected clear leads", () => {
-    const statements = relevanceStatements({
-      companyName: "AutoLeap",
-      scope: monitoringScope(keywords),
-      brief: { product: "shop software", buyer: "autoleap owners", keepWhen: "", notAbout: "" },
-    });
+  it("asks about the buyer only when looking for leads and a buyer was given", () => {
+    const ask = (goals: ("own_feedback" | "potential_clients")[], buyer: string) =>
+      relevanceStatements({
+        companyName: "AutoLeap",
+        scope: monitoringScope(keywords),
+        goals,
+        brief: { product: "shop software", buyer, keepWhen: "", notAbout: "" },
+      }).buyer_match;
 
-    expect(JSON.stringify(statements)).not.toContain("autoleap owners");
+    expect(ask(["potential_clients"], "shop owners")).toContain("shop owners");
+    expect(ask(["potential_clients"], " ")).toBeUndefined();
+    expect(ask(["own_feedback"], "shop owners")).toBeUndefined();
+  });
+});
+
+describe("buyer rules", () => {
+  const lead = { about_market: 0.9, buying_intent: 0.8, promotional: 0 };
+
+  it("skips a lead only when the author is clearly not the buyer", () => {
+    expect(combineRelevance({ ...lead, buyer_match: 0.05 })).toBe(0);
+    expect(combineRelevance({ ...lead, buyer_match: 0.1 })).toBe(0);
+  });
+
+  it("does not lower the score of a lead on a doubtful buyer, since a loose answer rejected clear leads", () => {
+    expect(combineRelevance({ ...lead, buyer_match: 0.2 })).toBeCloseTo(0.8);
+  });
+
+  it("does not use the buyer against feedback about the brand or a competitor", () => {
+    expect(combineRelevance({ ...lead, about_brand: 0.95, buyer_match: 0.01 })).toBeCloseTo(0.95);
+    expect(leadBuyerScore({ ...lead, about_brand: 0.95, buyer_match: 0.2 })).toBeNull();
+    expect(leadBuyerScore({ ...lead, about_competitor: 0.95, competitor_market: 0.9, buyer_match: 0.2 })).toBeNull();
+  });
+
+  it("reports the buyer score when the post is only a lead", () => {
+    expect(leadBuyerScore({ ...lead, buyer_match: 0.2 })).toBe(0.2);
+    expect(leadBuyerScore(lead)).toBeNull();
+    expect(leadBuyerScore(null)).toBeNull();
   });
 });
 

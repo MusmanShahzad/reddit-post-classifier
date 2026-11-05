@@ -38,7 +38,9 @@ Jev answers one question per concept, and code combines the answers:
 
 `competitor_market` asks whether the post is about this kind of product at all. Without it, a parcel complaint scored 0.89 for a pharmacy delivery company, just because it was about FedEx.
 
-Which questions are asked depends on the session's goal. A post with a score of 0.3 or less is skipped, and 0.7 or more is shown. Anything between is held under **Needs your check**. A post is also held when the checks disagree, such as a positive post when the user asked for complaints, or a very low match with what they asked to find.
+Which questions are asked depends on the session's goal. A post with a score of 0.3 or less is skipped, and 0.7 or more is shown. Anything between is held under **Needs your check**, unless Jev labels its purpose "other", in which case it is skipped. A post is also held when the checks disagree, such as a positive post when the user asked for complaints, or a very low match with what they asked to find.
+
+When a session names its buyer, a possible lead gets one more question: is the author that buyer? A clear no (0.1 or less) skips the post, and a doubtful answer (below 0.5) holds it. The answer does not otherwise lower the score, because an earlier version that used it directly rejected clear leads when the buyer was loosely worded. It never affects feedback about a brand or competitor, which can come from anyone. The buyer is optional in setup, so sessions without one do not get this check.
 
 **What was checked:**
 
@@ -49,18 +51,30 @@ Which questions are asked depends on the session's goal. A post with a score of 
 
 **Measured against labelled posts.** We labelled 72 real posts from four markets, by asking whether that session's team would want each one. The labels were written from the post text before any score was seen, and they were then compared with the real classifier. "Kept" includes posts held for a check, and "in the feed" means shown without one.
 
+**First measurement, before any change was made because of it:**
+
 | Posts | Count | Wanted | Kept: precision | Kept: recall | In the feed: precision | In the feed: recall |
 |---|---|---|---|---|---|---|
 | **New, not seen during development** | 33 | 5 | 29% (5/17) | 100% (5/5) | 57% (4/7) | 80% (4/5) |
 | Seen during development | 39 | 10 | 83% (10/12) | 100% (10/10) | 100% (9/9) | 90% (9/10) |
 | All | 72 | 15 | 52% (15/29) | 100% (15/15) | 81% (13/16) | 87% (13/15) |
 
-- **Trust the first row most.** Several rules were written while looking at the second row's posts, so those numbers flatter the filter.
-- **The sample is small,** with only 15 wanted posts. One post moves the new-post figures by 14 to 20 points, so treat these as a rough guide.
-- **One AI assistant wrote the labels,** not an independent person, and it also helped build the filter. Nothing was tuned after seeing these results.
-- **Overall,** the filter stopped 54 of the 57 unwanted posts from reaching the feed, and it never skipped a wanted post. Its main weakness is sending too many unwanted posts to **Needs your check**. Those cost a person a moment but do not pollute the feed.
+**After adding the buyer question and the "other" rule, with a clearly worded buyer.** Ranges cover two runs:
+
+| Posts | Count | Wanted | Kept: precision | Kept: recall | In the feed: precision | In the feed: recall |
+|---|---|---|---|---|---|---|
+| The same 33 posts | 33 | 5 | 71–83% (5/7, 5/6) | 100% (5/5) | 100% (3/3) | 60% (3/5) |
+| Seen during development | 39 | 10 | 100% (10/10) | 100% (10/10) | 100% (10/10) | 100% (10/10) |
+| All | 72 | 15 | 88–94% (15/17, 15/16) | 100% (15/15) | 100% (13/13) | 87% (13/15) |
+
+- **The second table is not a clean test.** Both changes came from studying the first table's errors, so all 72 posts now flatter the filter. Only a fresh set of labelled posts will show the real accuracy. The first table's top row is the last unbiased figure we have.
+- **There is a cost.** Feed recall on the 33 posts fell from 80% to 60%. "Samsara duo dash cameras", a wanted post, is now held for a check instead of shown. It is not lost, but someone has to open it.
+- **A loosely worded buyer costs speed, not posts.** Using "autoleap owners" and similar wording, no wanted post was skipped, but feed recall across all 72 fell to 60% (9/15) because the rest were held. Kept precision on the 33 posts was 45% (5/11). So the buyer's wording matters.
+- **The sample is small,** with only 15 wanted posts. One post moves the 33-post figures by 14 to 33 points, so treat these as a rough guide.
+- **One AI assistant wrote the labels,** not an independent person, and it also helped build the filter. It also wrote the buyers for two of the four sessions used in the second table.
+- **Jev's answers vary slightly between runs.** Across two runs with the same input, 32 of 72 scores changed, one by more than 0.1, and one post's decision changed. A post right on a line can land on either side.
 - **Category** matched on 14 of the 15 wanted posts. The miss was an angry complaint about a broken promise, labelled as a bug report.
-- **The strictest test was the pharmacy courier market.** No post came from a pharmacy looking for a courier, so nothing should have been kept, but 4 of its 17 were, and 2 reached the feed. All 4 were people looking for medication delivery for themselves or a friend: on topic, but not the buyer.
+- **The strictest test was the pharmacy courier market.** No post came from a pharmacy looking for a courier, so nothing should have been kept. At first 4 of its 17 were, all from people looking for medication for themselves or a friend. With the buyer question, none were.
 - **The labelled posts are not in this repo,** because they include personal details from people's posts, such as health information. `tests/eval/filter.eval.ts` is the measurement, and `npm run eval` reruns it on a file of your own.
 
 **Where it fails:**
@@ -75,6 +89,7 @@ Which questions are asked depends on the session's goal. A post with a score of 
 | Vendors and job adverts | They match a name search. The promotional question catches most but not all |
 | Short posts with no body | Too little text to judge, so they tend to be held or skipped |
 | Sarcasm and mixed feelings | One sentiment label is forced onto the whole post |
+| Wanted posts with no clear purpose | An unsure post labelled "other" is now skipped, so a useful one that fits no category is lost. None of the 15 wanted posts did this, but the sample is small |
 
 ## What 1,000 posts cost
 
@@ -107,7 +122,7 @@ Convert credits at your ScrapeBadger plan's rate. The search credits are by far 
 
 ## What is next
 
-1. **A larger labelled set,** of a few hundred posts labelled by someone independent, with a held-back part, to tune the thresholds and tighten who counts as the buyer.
+1. **A larger labelled set,** of a few hundred new posts labelled by someone independent, with a held-back part, to get an unbiased accuracy figure and tune the thresholds.
 2. **Login**, before the app is reachable from outside a private network.
 3. **Database migrations** instead of `prisma db push`, so schema changes can be reviewed and rolled back.
 4. **Dependency upgrades.** `npm audit` still reports issues in Next.js 15 and Zod 3 that need major version upgrades.

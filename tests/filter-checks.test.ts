@@ -127,6 +127,20 @@ describe("judgeDecision", () => {
     expect(decision.verdict).toBe("review");
   });
 
+  it("skips an unsure score with no recognisable purpose", () => {
+    expect(judgeDecision({ score: 0.5, threshold: 0.7, evidence: backed, category: "other" }).verdict).toBe("skip");
+    expect(judgeDecision({ score: 0.5, threshold: 0.7, evidence: backed, category: "complaint" }).verdict).toBe("review");
+    expect(judgeDecision({ score: 0.9, threshold: 0.7, evidence: backed, category: "other" }).verdict).toBe("show");
+  });
+
+  it("holds a clear lead when the author may not be the buyer", () => {
+    const decision = judgeDecision({ score: 0.9, threshold: 0.7, evidence: backed, buyerScore: 0.3 });
+    expect(decision.verdict).toBe("review");
+    expect(decision.checks.find((check) => check.id === "buyer")?.passed).toBe(false);
+    expect(judgeDecision({ score: 0.9, threshold: 0.7, evidence: backed, buyerScore: 0.8 }).verdict).toBe("show");
+    expect(judgeDecision({ score: 0.9, threshold: 0.7, evidence: backed, buyerScore: null }).verdict).toBe("show");
+  });
+
   it("does not hold on an unsure sentiment", () => {
     const decision = judgeDecision({
       score: 0.9,

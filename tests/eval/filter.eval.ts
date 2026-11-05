@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { it } from "vitest";
 import { judgeDecision, sessionEvidence } from "@/lib/filter-checks";
 import type { Goal } from "@/lib/goals";
+import { leadBuyerScore } from "@/lib/relevance";
 import { classifyPost } from "@/server/services/classifier";
 
 /**
@@ -33,6 +34,7 @@ interface Session {
   name: string;
   goals: Goal[];
   product: string;
+  buyer?: string;
   keepWhen: string;
   keywords: { type: string; value: string; aliases: string[]; ambiguous?: boolean }[];
 }
@@ -46,6 +48,7 @@ interface Row {
   expectedCategory: string | null;
   category: string;
   title: string;
+  scores: unknown;
 }
 
 const ratio = (part: number, whole: number) => (whole > 0 ? `${((part / whole) * 100).toFixed(0)}% (${part}/${whole})` : "n/a");
@@ -71,7 +74,7 @@ it("reports precision and recall", async () => {
       postedAt: new Date(post.postedAt),
       goals: session.goals,
       keywords,
-      brief: { product: session.product, buyer: "", keepWhen: session.keepWhen, notAbout: "" },
+      brief: { product: session.product, buyer: session.buyer ?? "", keepWhen: session.keepWhen, notAbout: "" },
     });
     const { verdict } = judgeDecision({
       score: result.relevanceScore,
@@ -81,6 +84,8 @@ it("reports precision and recall", async () => {
       sentiment: result.sentiment,
       sentimentConfidence: result.sentimentConfidence,
       requestScore: result.relevanceScores?.matches_request,
+      buyerScore: leadBuyerScore(result.relevanceScores),
+      category: result.category,
     });
     rows.push({
       id: post.id,
@@ -91,6 +96,7 @@ it("reports precision and recall", async () => {
       expectedCategory: post.category,
       category: result.category,
       title: post.title.slice(0, 80),
+      scores: result.relevanceScores,
     });
   }
 

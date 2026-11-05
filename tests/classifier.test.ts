@@ -115,9 +115,18 @@ describe("what is sent to Jev", () => {
     ]);
   });
 
-  it("does not ask a question from the buyer text", async () => {
-    await classifyPost({ ...input, brief: { ...brief, buyer: "autoleap owners" } });
-    expect(JSON.stringify(sentRequest().questions)).not.toContain("autoleap owners");
+  it("asks who the buyer is only when the session named one", async () => {
+    await classifyPost({ ...input, brief: { ...brief, buyer: "shop owners" } });
+    expect(sentRequest().questions.buyer_match!.instructions).toContain("shop owners");
+  });
+
+  it("does not keep an unsure post with no recognisable purpose", async () => {
+    systemOne.mockResolvedValue({
+      answers: answers({ about_market: { noul: 0.5 }, category: { choice: "other", confidence: 0.8 } }),
+    });
+    const result = await classifyPost(input);
+    expect(result.isRelevant).toBe(false);
+    expect(result.urgency).toBeNull();
   });
 
   it("names the competitors when asking who the author is", async () => {

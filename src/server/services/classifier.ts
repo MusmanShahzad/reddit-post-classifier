@@ -17,7 +17,7 @@
 
 import { TypeSafeClient, choice, noul, score } from "@typesafe-ai/sdk";
 import { env } from "@/env";
-import { aliasList, SKIP_AT } from "@/lib/filter-checks";
+import { aliasList, keepsPost, SKIP_AT } from "@/lib/filter-checks";
 import { GOALS, type Goal } from "@/lib/goals";
 import {
   combineRelevance,
@@ -288,7 +288,7 @@ export async function classifyPost(
   const urgencyRaw = answers.urgency.score;
   const urgencyNormalized = urgencyLevel(urgencyRaw);
   const threshold = env.RELEVANCE_THRESHOLD ?? 0.7;
-  const isRelevant = relevanceScore > SKIP_AT;
+  const isRelevant = keepsPost(relevanceScore, threshold, answers.category.choice);
 
   return {
     isRelevant,

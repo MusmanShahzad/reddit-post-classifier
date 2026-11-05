@@ -7,6 +7,7 @@
  */
 
 import { judgeDecision, sessionEvidence, type FilterDecision } from "@/lib/filter-checks";
+import { leadBuyerScore } from "@/lib/relevance";
 import { parseGoals } from "@/lib/goals";
 import { aliasList, trackedKeyword } from "@/lib/post-tags";
 import { rateLimitWait } from "@/lib/rate-limit";
@@ -187,6 +188,8 @@ async function classifyOne(context: ClassifyContext, post: Post): Promise<void> 
       sentiment: classification.sentiment,
       sentimentConfidence: classification.sentimentConfidence,
       requestScore: classification.relevanceScores?.matches_request,
+      buyerScore: leadBuyerScore(classification.relevanceScores),
+      category: classification.category,
     });
 
     let reason: string | null = null;

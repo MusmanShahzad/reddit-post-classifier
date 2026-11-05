@@ -213,6 +213,7 @@ export interface RelevanceStatements {
   competitor_market?: string;
   about_market?: string;
   buying_intent?: string;
+  buyer_match?: string;
   matches_request?: string;
   excluded?: string;
   promotional: string;
@@ -242,6 +243,7 @@ export function relevanceStatements(input: {
   const goals = input.goals ?? GOALS;
   const product =
     input.brief?.product?.trim() || input.scope.definingTopics.join(", ") || `what ${input.companyName} sells`;
+  const buyer = input.brief?.buyer?.trim();
   const keepWhen = input.brief?.keepWhen?.trim();
   const notAbout = input.brief?.notAbout?.trim();
   const hasSkipRule = notAbout && notAbout.toLowerCase() !== NOTHING_TO_SKIP;
@@ -268,6 +270,7 @@ export function relevanceStatements(input: {
       ? {
           about_market: `The author is choosing, buying, using, or having a problem with this kind of product: ${product}.`,
           buying_intent: `The author is looking for, comparing, or deciding on this kind of product for their own business or use: ${product}.`,
+          ...(buyer ? { buyer_match: `The author is one of these people, or is buying on behalf of one: ${buyer}.` } : {}),
         }
       : {}),
     ...(keepWhen ? { matches_request: `The post is this kind of conversation: ${keepWhen}.` } : {}),
@@ -286,13 +289,31 @@ export function relevanceStatements(input: {
  * 0.89 as being about FedEx, but it says nothing to a pharmacy delivery company.
  */
 export function combineRelevance(scores: RelevanceScores): number {
-  const client =
-    scores.about_market !== undefined && scores.buying_intent !== undefined
-      ? Math.min(scores.about_market, scores.buying_intent)
-      : 0;
-  const competitor = Math.min(scores.about_competitor ?? 0, scores.competitor_market ?? 1);
-  const bestGoal = Math.max(scores.about_brand ?? 0, competitor, client);
+  const bestGoal = Math.max(feedbackScore(scores), leadScore(scores));
   return Math.min(bestGoal, 1 - (scores.excluded ?? 0), 1 - (scores.promotional ?? 0));
+}
+
+/** At or below this, the author is clearly not the buyer, even if the buyer was loosely worded. */
+const CLEARLY_NOT_THE_BUYER = 0.1;
+
+function feedbackScore(scores: RelevanceScores): number {
+  const competitor = Math.min(scores.about_competitor ?? 0, scores.competitor_market ?? 1);
+  return Math.max(scores.about_brand ?? 0, competitor);
+}
+
+function leadScore(scores: RelevanceScores): number {
+  if (scores.about_market === undefined || scores.buying_intent === undefined) return 0;
+  if (scores.buyer_match !== undefined && scores.buyer_match <= CLEARLY_NOT_THE_BUYER) return 0;
+  return Math.min(scores.about_market, scores.buying_intent);
+}
+
+/**
+ * The buyer score, when the post is kept only as a possible lead. Feedback about
+ * a brand or competitor can come from anyone, so it returns null for those.
+ */
+export function leadBuyerScore(scores: RelevanceScores | null | undefined): number | null {
+  if (!scores || leadScore(scores) <= feedbackScore(scores)) return null;
+  return scores.buyer_match ?? null;
 }
 
 /**

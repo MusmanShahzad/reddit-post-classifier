@@ -17,6 +17,18 @@ export const SKIP_AT = 0.3;
 /** A post this far from what the user asked to find waits for a person. */
 export const REQUEST_MISMATCH_AT = 0.1;
 
+/** A possible lead below this may not be the buyer, so it waits for a person. */
+export const BUYER_DOUBT_BELOW = 0.5;
+
+/**
+ * Whether a post is kept at all. An unsure score with no recognisable purpose is
+ * skipped, because almost all of those were noise that a person had to clear.
+ */
+export function keepsPost(score: number, threshold: number, category?: string | null): boolean {
+  if (score <= SKIP_AT) return false;
+  return score >= threshold || category !== "other";
+}
+
 /** Short or common words that cannot prove what a post is about. */
 const WEAK_WORDS = new Set([
   "about", "also", "best", "business", "buy", "company", "customer", "customers", "find",
@@ -145,7 +157,7 @@ export function askedMood(keepWhen: string): "negative" | "positive" | null {
 export type FilterVerdict = "show" | "review" | "skip";
 
 export interface FilterCheck {
-  id: "score" | "mood" | "request";
+  id: "score" | "mood" | "request" | "buyer";
   passed: boolean;
   detail: string;
 }
@@ -167,17 +179,21 @@ export interface DecisionInput {
   sentimentConfidence?: number | null;
   /** Jev's score for whether the post matches what the user asked to find. */
   requestScore?: number | null;
+  /** The author's match with the session's buyer, when the post is only a possible lead. */
+  buyerScore?: number | null;
+  /** Jev's label for the post's main purpose. */
+  category?: string | null;
 }
 
 /**
  * Skips a clearly low score, shows a clearly high one, and holds anything
- * between for review. A post that clashes with the mood the user asked for, or
- * that clearly is not what they asked to find, is also held. Naming a brand or
- * product is recorded but is not required, since a potential client often names
- * neither.
+ * between for review. A post that clashes with the mood the user asked for, that
+ * clearly is not what they asked to find, or whose author may not be the buyer
+ * is also held. Naming a brand or product is recorded but is not required, since
+ * a potential client often names neither.
  */
 export function judgeDecision(input: DecisionInput): FilterDecision {
-  const skipped = input.score <= SKIP_AT;
+  const skipped = !keepsPost(input.score, input.threshold, input.category);
   const clear = input.score >= input.threshold;
   const borderline = !skipped && !clear;
 
@@ -219,6 +235,17 @@ export function judgeDecision(input: DecisionInput): FilterDecision {
       detail: matches
         ? "Does not clearly conflict with what they asked to find"
         : `Scored ${input.requestScore.toFixed(2)} against what they asked to find`,
+    });
+  }
+
+  if (typeof input.buyerScore === "number") {
+    const matches = input.buyerScore >= BUYER_DOUBT_BELOW;
+    checks.push({
+      id: "buyer",
+      passed: matches,
+      detail: matches
+        ? "The author looks like the buyer"
+        : `Scored ${input.buyerScore.toFixed(2)} as the buyer they described`,
     });
   }
 
