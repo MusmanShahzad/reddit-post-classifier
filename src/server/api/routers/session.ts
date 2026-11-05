@@ -92,7 +92,7 @@ export const sessionRouter = createTRPCRouter({
 
   /** Clears the open session's new-post badge. Returns the earlier time, so the feed can mark what arrived since. */
   markSeen: publicProcedure.mutation(async ({ ctx }) => {
-    const companyId = await activeSessionId(ctx.db);
+    const companyId = await activeSessionId(ctx);
     if (!companyId) return { previous: null };
 
     const company = await ctx.db.company.findUnique({ where: { id: companyId }, select: { lastSeenAt: true } });

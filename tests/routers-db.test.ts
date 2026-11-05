@@ -13,6 +13,7 @@ vi.mock("@/server/services/classifier", async (importOriginal) => ({
 }));
 
 import { createCallerFactory } from "@/server/api/trpc";
+import { SESSION_HEADER, sessionIdFromPath } from "@/lib/session-header";
 import { collectorRouter } from "@/server/api/routers/collector";
 import { onboardingRouter } from "@/server/api/routers/onboarding";
 import { postRouter } from "@/server/api/routers/post";
@@ -24,7 +25,7 @@ let handle: Awaited<ReturnType<typeof createTestDb>>;
 let db: TestDb;
 let companyId: string;
 
-const ctx = () => ({ db, headers: new Headers() });
+const ctx = (headers: Record<string, string> = {}) => ({ db, headers: new Headers(headers) });
 const post = () => createCallerFactory(postRouter)(ctx());
 const settings = () => createCallerFactory(settingsRouter)(ctx());
 const collector = () => createCallerFactory(collectorRouter)(ctx());
@@ -520,6 +521,35 @@ describe("sessions", () => {
     topicKeywords: [{ value: "standing desk" }],
     subreddits: ["StandingDesk"],
   };
+
+  describe("in two tabs", () => {
+    const inTab = (id: string) => ctx({ [SESSION_HEADER]: id });
+
+    it("answers each tab for its own session, without changing the remembered one", async () => {
+      const other = await db.company.create({ data: { name: "Other co", product: "chairs", keepWhen: "reviews" } });
+      await db.searchQuery.create({ data: { companyId: other.id, query: '"Other co"' } });
+
+      const company = await createCallerFactory(settingsRouter)(inTab(other.id)).getCompany();
+      const schedule = await createCallerFactory(collectorRouter)(inTab(other.id)).getSchedule();
+      const remembered = await settings().getCompany();
+
+      expect(company?.id).toBe(other.id);
+      expect(schedule.searchesPerRun).toBe(1);
+      expect(remembered?.id).toBe(companyId);
+      expect((await session().list()).activeId).toBe(companyId);
+    });
+
+    it("uses the remembered session when a tab names one that is gone", async () => {
+      const company = await createCallerFactory(settingsRouter)(inTab("deleted-session")).getCompany();
+      expect(company?.id).toBe(companyId);
+    });
+  });
+
+  it("reads the session from a page's address", () => {
+    expect(sessionIdFromPath("/cmw2iz67k0037")).toBe("cmw2iz67k0037");
+    expect(sessionIdFromPath("/")).toBeNull();
+    expect(sessionIdFromPath("/a/b")).toBeNull();
+  });
 
   it("saving onboarding creates a new session and keeps the old one", async () => {
     await onboarding().saveConfig({ companyName: "Deskly", sessionName: "Deskly bad reviews", ...brief });

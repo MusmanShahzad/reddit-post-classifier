@@ -32,7 +32,7 @@ export const collectorRouter = createTRPCRouter({
    */
   getLastRun: publicProcedure.query(async ({ ctx }) => {
     await reconcileStaleRuns(ctx.db);
-    const companyId = await activeSessionId(ctx.db);
+    const companyId = await activeSessionId(ctx);
     return companyId ? findDisplayRun(ctx.db, companyId) : null;
   }),
 
@@ -43,7 +43,7 @@ export const collectorRouter = createTRPCRouter({
   getSchedule: publicProcedure.query(async ({ ctx }) => {
     startScheduler();
     const settings = await ctx.db.appSettings.findUnique({ where: { id: "default" } });
-    const companyId = settings?.activeCompanyId ?? null;
+    const companyId = await activeSessionId(ctx);
     const intervalMins = clampInterval(settings?.collectionIntervalMins);
 
     const [last, queuedRun, queryRows] = await Promise.all([

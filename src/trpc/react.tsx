@@ -7,6 +7,7 @@ import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
 import SuperJSON from "superjson";
 
+import { sessionHeaders } from "@/lib/session-header";
 import { isConnectionFailure } from "@/lib/trpc-error";
 import { type AppRouter } from "@/server/api/root";
 import { createQueryClient } from "./query-client";
@@ -62,6 +63,11 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
           headers: () => {
             const headers = new Headers();
             headers.set("x-trpc-source", "nextjs-react");
+            if (typeof window !== "undefined") {
+              for (const [name, value] of Object.entries(sessionHeaders(window.location.pathname))) {
+                headers.set(name, value);
+              }
+            }
             return headers;
           },
         }),

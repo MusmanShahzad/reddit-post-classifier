@@ -42,13 +42,11 @@ export const settingsRouter = createTRPCRouter({
    * @returns Company record with relations, or `null` if no company is configured.
    */
   getCompany: publicProcedure.query(async ({ ctx }) => {
-    const settings = await ctx.db.appSettings.findUnique({
-      where: { id: "default" },
-    });
-    if (!settings?.activeCompanyId) return null;
+    const companyId = await activeSessionId(ctx);
+    if (!companyId) return null;
 
     return ctx.db.company.findUnique({
-      where: { id: settings.activeCompanyId },
+      where: { id: companyId },
       include: {
         keywords: true,
         subreddits: true,
@@ -69,7 +67,7 @@ export const settingsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const companyId = await activeSessionId(ctx.db);
+      const companyId = await activeSessionId(ctx);
       if (!companyId) throw new TRPCError({ code: "NOT_FOUND", message: "No active session." });
       return ctx.db.company.update({
         where: { id: companyId },
@@ -285,10 +283,9 @@ export const settingsRouter = createTRPCRouter({
    * Totals for every search and keyword, so weak tags can be edited.
    */
   getTagPerformance: publicProcedure.query(async ({ ctx }) => {
-    const settings = await ctx.db.appSettings.findUnique({ where: { id: "default" } });
-    if (!settings?.activeCompanyId) return { keywords: [], queries: [] };
+    const companyId = await activeSessionId(ctx);
+    if (!companyId) return { keywords: [], queries: [] };
 
-    const companyId = settings.activeCompanyId;
     const [keywords, searches, taggedPosts] = await Promise.all([
       ctx.db.keyword.findMany({ where: { companyId } }),
       ctx.db.collectionSearch.findMany({

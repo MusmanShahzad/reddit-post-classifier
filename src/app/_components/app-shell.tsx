@@ -40,6 +40,9 @@ const DEFAULT_TITLE = "Radarr — Reddit Listening Tool";
 /** Survives the remount that a new `/[sessionId]` URL causes. */
 let lastTab = "dashboard";
 
+/** The session the cached answers belong to, so a remount does not throw them away. */
+let cachedSessionId: string | null = null;
+
 export function AppShell({ sessionId }: { sessionId?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -67,7 +70,7 @@ export function AppShell({ sessionId }: { sessionId?: string }) {
   });
   const switchTo = api.session.switchTo.useMutation();
   const remove = api.session.remove.useMutation();
-  const switching = useRef<string | null>(null);
+  const [readyFor, setReadyFor] = useState(cachedSessionId);
 
   const setTab = (id: string) => {
     lastTab = id;
@@ -78,8 +81,8 @@ export function AppShell({ sessionId }: { sessionId?: string }) {
   const activeId = data?.activeId ?? null;
   const shownId = sessionId ?? activeId;
   const active = sessions.find((session) => session.id === shownId);
-  const pending = Boolean(data && sessionId && sessionId !== activeId);
-  const busy = switchTo.isPending || remove.isPending;
+  const pending = Boolean(data && sessionId && sessionId !== readyFor);
+  const busy = remove.isPending;
   const totalNew = sessions.reduce((total, session) => total + session.newPosts, 0);
   const activeNew = active?.newPosts ?? 0;
 
@@ -109,7 +112,7 @@ export function AppShell({ sessionId }: { sessionId?: string }) {
       },
     });
 
-  // The URL decides which session is shown.
+  // The URL decides which session this tab shows. Another tab can show a different one.
   useEffect(() => {
     if (!data) return;
 
@@ -117,31 +120,23 @@ export function AppShell({ sessionId }: { sessionId?: string }) {
       if (activeId) router.replace(`/${activeId}`);
       return;
     }
-    if (sessionId === activeId || switching.current === sessionId) return;
 
     if (!sessions.some((session) => session.id === sessionId)) {
       setError("That session no longer exists. Showing the current one.");
       router.replace(activeId ? `/${activeId}` : "/");
       return;
     }
+    if (sessionId === readyFor) return;
 
-    switching.current = sessionId;
     setError(null);
-    switchTo
-      .mutateAsync({ id: sessionId })
-      .then(async () => {
-        forgetSessionData();
-        await utils.session.list.invalidate();
-      })
-      .catch((cause: unknown) => {
-        setError(readableError(cause instanceof Error ? cause : null) ?? "Could not switch session.");
-        router.replace(activeId ? `/${activeId}` : "/");
-      })
-      .finally(() => {
-        switching.current = null;
-      });
+    if (cachedSessionId !== sessionId) forgetSessionData();
+    cachedSessionId = sessionId;
+    setReadyFor(sessionId);
+    // Remembered once per visit, for the home page. Doing this on every refresh made
+    // two tabs take it from each other. A failure only affects where home leads.
+    if (sessionId !== activeId) switchTo.mutate({ id: sessionId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, sessionId, activeId]);
+  }, [data, sessionId, activeId, readyFor]);
 
   const select = (id: string) => {
     setError(null);
@@ -224,7 +219,7 @@ export function AppShell({ sessionId }: { sessionId?: string }) {
           {pending || !data ? (
             <DashboardSkeleton />
           ) : (
-            <div key={activeId ?? "none"} className="animate-rise-in">
+            <div key={shownId ?? "none"} className="animate-rise-in">
               {tab === "dashboard" && (
                 <Dashboard
                   onOpenReview={() => {

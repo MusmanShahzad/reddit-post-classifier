@@ -11,6 +11,7 @@ import {
   Flame,
   Layers,
 } from "lucide-react";
+import { sessionHeaders } from "@/lib/session-header";
 import { api } from "@/trpc/react";
 import { StatCard, DashboardSkeleton } from "@/components/atoms";
 import {
@@ -65,7 +66,7 @@ export function Dashboard({ onOpenReview }: { onOpenReview?: () => void }) {
     setIsStarting(true);
     setStartError(null);
     try {
-      const response = await fetch("/api/collect", { method: "POST" });
+      const response = await fetch("/api/collect", { method: "POST", headers: sessionHeaders(window.location.pathname) });
       const body = (await response.json().catch(() => null)) as { error?: string; queued?: boolean } | null;
       if (!response.ok) {
         setStartError(body?.error ?? "Collection did not start");

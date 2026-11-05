@@ -65,7 +65,7 @@ export const postRouter = createTRPCRouter({
       }),
     )
     .query(async ({ ctx, input }) => {
-      const companyId = (await activeSessionId(ctx.db)) ?? NO_SESSION;
+      const companyId = (await activeSessionId(ctx)) ?? NO_SESSION;
       const posts = await ctx.db.redditPost.findMany({
         omit: { rawJson: true },
         include: { authorProfile: { select: { displayName: true, iconUrl: true } } },
@@ -113,7 +113,7 @@ export const postRouter = createTRPCRouter({
   getPostDetail: publicProcedure
     .input(z.object({ postId: z.string() }))
     .query(async ({ ctx, input }) => {
-      const companyId = (await activeSessionId(ctx.db)) ?? NO_SESSION;
+      const companyId = (await activeSessionId(ctx)) ?? NO_SESSION;
       const post = await ctx.db.redditPost.findFirst({
         omit: { rawJson: true },
         where: { id: input.postId, companyId },
@@ -167,7 +167,7 @@ export const postRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const post = await ctx.db.redditPost.findUnique({ where: { id: input.postId } });
-      if (!post || post.companyId !== (await activeSessionId(ctx.db))) {
+      if (!post || post.companyId !== (await activeSessionId(ctx))) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Post not found in this session." });
       }
       // A saved, not-relevant post must go through markRelevant, or it would
@@ -198,7 +198,7 @@ export const postRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const post = await ctx.db.redditPost.findUnique({ where: { id: input.postId } });
-      if (!post || post.companyId !== (await activeSessionId(ctx.db))) {
+      if (!post || post.companyId !== (await activeSessionId(ctx))) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Post not found in this session." });
       }
       if (post.isRelevant === true) {
@@ -253,7 +253,7 @@ export const postRouter = createTRPCRouter({
    * @returns Stats object with counts and breakdown arrays.
    */
   getStats: publicProcedure.query(async ({ ctx }) => {
-    const companyId = (await activeSessionId(ctx.db)) ?? NO_SESSION;
+    const companyId = (await activeSessionId(ctx)) ?? NO_SESSION;
     const [total, relevant, filtered, urgent, pending, handled, dismissed, review, rateLimited, open] =
       await Promise.all([
         ctx.db.redditPost.count({ where: { companyId } }),
@@ -316,7 +316,7 @@ export const postRouter = createTRPCRouter({
    * and the user's own handle / dismiss actions, so it costs no API calls.
    */
   getFilterQuality: publicProcedure.query(async ({ ctx }) => {
-    const companyId = (await activeSessionId(ctx.db)) ?? NO_SESSION;
+    const companyId = (await activeSessionId(ctx)) ?? NO_SESSION;
     const threshold = env.RELEVANCE_THRESHOLD ?? 0.7;
     const [company, posts] = await Promise.all([
       ctx.db.company.findUnique({ where: { id: companyId }, include: { keywords: true } }),
@@ -337,7 +337,7 @@ export const postRouter = createTRPCRouter({
   getRecentActivity: publicProcedure
     .input(z.object({ limit: z.number().int().min(1).max(200).default(20) }))
     .query(async ({ ctx, input }) => {
-      const companyId = (await activeSessionId(ctx.db)) ?? NO_SESSION;
+      const companyId = (await activeSessionId(ctx)) ?? NO_SESSION;
       const logs = await ctx.db.collectionLog.findMany({
         where: { run: { companyId } },
         orderBy: { timestamp: "desc" },

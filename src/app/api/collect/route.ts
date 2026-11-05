@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isSameSiteRequest } from "@/lib/request-guard";
 import { db } from "@/server/db";
+import { activeSessionId } from "@/server/services/active-session";
 import { enqueueCollection } from "@/server/services/collection-runs";
 
 export const dynamic = "force-dynamic";
@@ -12,18 +13,16 @@ export async function POST(request: Request) {
   }
 
   try {
-    const settings = await db.appSettings.findUnique({
-      where: { id: "default" },
-    });
+    const companyId = await activeSessionId({ db, headers: request.headers });
 
-    if (!settings?.activeCompanyId) {
+    if (!companyId) {
       return NextResponse.json(
         { error: "No company configured. Complete onboarding first." },
         { status: 400 },
       );
     }
 
-    const result = await enqueueCollection(db, settings.activeCompanyId);
+    const result = await enqueueCollection(db, companyId);
 
     return NextResponse.json(
       {
