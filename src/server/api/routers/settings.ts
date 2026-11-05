@@ -256,10 +256,9 @@ export const settingsRouter = createTRPCRouter({
   }),
 
   /**
-   * Updates global app settings (collection interval, relevance threshold).
+   * Updates global app settings.
    *
    * @param input.collectionIntervalMins - Minutes between auto-collections (5–1440).
-   * @param input.relevanceThreshold     - Minimum Jev noul score for relevance (0–1).
    * @param input.autoCollectEnabled     - Master switch for every scheduled run.
    * @param input.authorLookupsEnabled   - Whether paid author profile lookups are sent.
    * @param input.authorLookupsPerRun    - The most paid profile lookups in one run (1–200).
@@ -269,7 +268,6 @@ export const settingsRouter = createTRPCRouter({
     .input(
       z.object({
         collectionIntervalMins: z.number().int().min(5).max(1440).optional(),
-        relevanceThreshold: z.number().min(0).max(1).optional(),
         autoCollectEnabled: z.boolean().optional(),
         authorLookupsEnabled: z.boolean().optional(),
         authorLookupsPerRun: z.number().int().min(1).max(200).optional(),

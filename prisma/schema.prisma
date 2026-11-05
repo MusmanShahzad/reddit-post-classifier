@@ -325,7 +325,6 @@ model AppSettings {
   authorLookupsEnabled    Boolean @default(true)
   /// The most paid profile lookups in one run.
   authorLookupsPerRun     Int    @default(25)
-  relevanceThreshold      Float  @default(0.6)
   isOnboardingComplete    Boolean @default(false)
   activeCompanyId         String?
 }

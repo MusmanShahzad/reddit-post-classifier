@@ -7,7 +7,7 @@ import { X } from "lucide-react";
  *
  * @param label       - The visible text inside the badge.
  * @param sublabel    - Optional secondary text shown in reduced opacity.
- * @param variant     - shadcn Badge variant (defaults to `"default"`).
+ * @param variant     - Badge style (defaults to `"default"`).
  * @param onRemove    - Called when the "×" button is clicked.
  *
  * @example
