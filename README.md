@@ -1,143 +1,138 @@
-# 🔴 Radarr — Reddit Listening Tool
+# Radarr: Reddit listening tool
 
-A social listening tool that finds Reddit conversations a company cares about, filters out noise using AI, and shows what's worth acting on.
+Radarr finds Reddit posts a company cares about, drops the noise, and shows what is worth acting on.
 
-## What It Does
+1. **Set up a session.** Describe the company, what it sells and what to find. Radarr suggests competitors, topics and subreddits for you to check.
+2. **Collect.** Searches run on a schedule, or when you press the button. A post is never saved twice, and a dismissed post never comes back.
+3. **Classify.** Jev decides whether each post is relevant and labels its category, sentiment, urgency and audience. GPT-4o-mini writes a one-line reason for the posts that pass.
+4. **Act.** The feed updates live. Filter it, open a post to see its author and their other posts, then mark it handled or dismiss it.
 
-1. **Smart Onboarding** — Chat with Radarr to describe your company. It extracts brand names, competitors, topics, and suggests subreddits using GPT-4o
-2. **Collect from Reddit** — Fetches matching posts via Reddit's API with auto-generated search queries. Deduplicates across runs
-3. **AI Classification** — Uses TypeSafe AI's Jev model for instant structured classification (category, sentiment, urgency) and GPT-4o-mini for one-line summaries
-4. **Actionable Feed** — Filterable feed of relevant posts. Mark as handled or dismiss. Dismissed posts never return
+## Quick start
 
-## Quick Start (5 minutes)
+You need **Node.js 22.15 or newer**, which the Jev client requires, and three API keys.
 
-### Prerequisites
-- **Node.js 22+** (required for TypeSafe SDK)
-- **npm**
-
-### 1. Clone and Install
+### 1. Install
 
 ```bash
 git clone <repo-url>
-cd radarr
+cd reditt-post-classifier
 npm install
-```
-
-### 2. Get Your API Keys
-
-You need 3 API keys (all free or pay-as-you-go):
-
-#### Reddit API (free, 2 minutes)
-1. Go to [reddit.com/prefs/apps](https://reddit.com/prefs/apps)
-2. Click **"create another app..."**
-3. Choose **"script"** type
-4. Set redirect URI to `http://localhost:3000`
-5. Copy the **client ID** (under app name) and **secret**
-
-#### TypeSafe AI / Jev (1 minute)
-1. Go to [console.typesafe.ai](https://console.typesafe.ai)
-2. Create an account → API Keys → Create new key
-3. Copy the key
-
-#### OpenAI (1 minute)
-1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Create a new secret key
-3. Ensure you have at least $5 in credits
-
-### 3. Configure
-
-```bash
 cp .env.example .env
-# Edit .env with your 4 API key values
 ```
 
-### 4. Initialize Database
+On Windows Command Prompt, use `copy .env.example .env` for the last line.
+
+### 2. Get your three API keys
+
+Paste each one into `.env`, after the `=` on its line.
+
+**`SCRAPEBADGER_API_KEY`**, which fetches Reddit posts:
+1. Sign up at [scrapebadger.com/auth/signup](https://scrapebadger.com/auth/signup). No credit card is needed, and signup includes free credits.
+2. Open [the API keys page](https://scrapebadger.com/dashboard/api-keys) and create a key.
+
+**`TYPESAFE_API_KEY`**, for Jev, which filters and labels posts:
+1. Create an account or sign in at [console.typesafe.ai](https://console.typesafe.ai).
+2. Open the API Keys section and create a key.
+
+**`OPENAI_API_KEY`**, which sets up sessions and writes the one-line reasons:
+1. Sign in at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+2. Click **Create new secret key**.
+3. Make sure the account has billing credit.
+
+Every other value in `.env.example` works as it is. The Reddit client ID and secret are only for the optional official API.
+
+### 3. Start the app
 
 ```bash
-npx prisma db push
+npm run db:push
+npm run build
+npm start
 ```
 
-### 5. Start
+Open [http://localhost:3000](http://localhost:3000). For development, use `npm run dev` instead of `build` and `start`.
 
-```bash
-npm run dev
-```
+### 4. Set up what to track
 
-Open [http://localhost:3000](http://localhost:3000)
+1. Enter the company name, what it sells, and what to find. Press **Continue**.
+2. On the review screen, check the brand names, competitors, topics and subreddits. Remove anything that does not fit, or add what is missing.
+3. Press **Start monitoring**.
 
-### 6. Trigger a Collection
+### 5. Trigger a collection run
 
-**Option A**: Use the dashboard UI — click "🔄 Run Collection Now"
+There are three ways, and you only need one:
 
-**Option B**: API call:
+- **Wait for the schedule.** A new session collects automatically, and its first run starts within about 30 seconds. After that it runs every 30 minutes, which you can change in Settings.
+- **Press Run collection** on the Dashboard.
+- **Call the endpoint.** This runs the session that is open:
+
 ```bash
 curl -X POST http://localhost:3000/api/collect
 ```
 
-## Running Tests
+Running it again does not create duplicates. Watch the progress on the Dashboard, then open **Feed** to filter posts by category and urgency, and mark them handled or dismissed.
+
+**A new session starts spending as soon as you create it.** To stop that, turn off **Collect automatically** in Settings.
+
+## What it costs
+
+ScrapeBadger charges **8 credits per search that returns posts** (about 7 posts), nothing for a search that returns none, and **5 credits per author profile**. Settings shows the most your session can spend. To reduce it:
+
+- Raise the minutes between runs, or turn off **Collect automatically**.
+- Turn off **Include this session in the schedule** for sessions you only check now and then.
+- Turn off **Look up author profiles**, or lower the limit per run. Posts then show the username with no picture.
+
+See [DECISIONS.md](./DECISIONS.md) for the full breakdown.
+
+## Running it in production
+
+- **It needs one long-running server.** The scheduler and the worker live in the app's process, and the database is a SQLite file. It will not work on serverless hosting, and you should not run two copies against one database. Use a VM or a container with a persistent disk.
+- **Put login in front of it.** The app has no accounts, so anyone who can reach it can read posts, delete sessions and spend your credits. Keep it on a private network or behind an authenticating proxy.
+- **Back up the database.** All your data is in the file `DATABASE_URL` points to. Point it at the persistent disk, using an absolute path.
+- **Monitor `/api/health`.** It answers 200 when the database and the scheduler are working, and 503 when they are not.
+- **After upgrading,** run `npm run db:push` to apply schema changes, then rebuild and restart. New columns are safe to add. Read Prisma's warnings if it reports anything else.
+
+A restart is safe at any time. Finished searches are not fetched or paid for again, and a rate-limit wait carries on where it stopped.
+
+## Tests
 
 ```bash
 npm test
+npm run test:e2e
+npm run typecheck
 ```
 
-42 tests covering deduplication, Jev output parsing, query generation, and guardrail validation.
+- `npm test` runs the unit and database tests. It needs no keys and spends nothing.
+- `npm run test:e2e` builds the app and drives the production build in a real browser, including the real scheduler. It takes about 5 minutes and spends nothing, because ScrapeBadger, Jev and OpenAI are local stand-ins. If Chromium is missing, run `npx playwright install chromium`. Screenshots go to `e2e-artifacts/`.
 
-## Architecture
+## How it is built
 
-### Tech Stack
-- **Framework**: Next.js 14+ (App Router) with TypeScript
-- **API**: tRPC for type-safe client-server communication
-- **Database**: SQLite via Prisma (zero setup)
-- **UI**: Tailwind CSS + shadcn/ui
-- **Classification**: TypeSafe AI Jev (structured) + OpenAI GPT-4o-mini (summaries)
-- **Onboarding**: OpenAI GPT-4o (extraction) with 4-layer guardrails
-
-### Classification Pipeline
-```
-Reddit API → Fetch posts → Deduplicate → Store
-                                            ↓
-                          Jev (relevance + category + sentiment + urgency)
-                                            ↓
-                          GPT-4o-mini (one-line summary, relevant posts only)
-                                            ↓
-                                    Feed (filterable UI)
-```
-
-### Cost
-~$0.06 per 1,000 posts processed. See [DECISIONS.md](./DECISIONS.md) for full breakdown.
-
-## Project Structure
+Next.js 15, tRPC, Prisma with SQLite, Tailwind CSS with daisyUI.
 
 ```
-src/
-├── app/
-│   ├── page.tsx                 ← Entry point (routes to onboarding or dashboard)
-│   ├── api/collect/route.ts     ← SSE endpoint for collection with live progress
-│   └── _components/
-│       ├── onboarding-chat.tsx  ← Chat-based setup wizard
-│       ├── app-shell.tsx        ← Main app layout with tabs
-│       ├── dashboard.tsx        ← Stats, category breakdown, collection controls
-│       ├── feed.tsx             ← Filterable post feed with actions
-│       └── settings.tsx         ← Keyword/subreddit/query management
-├── server/
-│   ├── api/routers/
-│   │   ├── onboarding.ts       ← Chat processing, config saving, guardrails
-│   │   ├── post.ts             ← Feed queries, stats, status updates
-│   │   ├── collector.ts        ← Collection run queries
-│   │   └── settings.ts         ← CRUD for keywords, subreddits, queries
-│   └── services/
-│       ├── reddit.ts            ← Reddit OAuth2 + search API
-│       ├── classifier.ts       ← TypeSafe Jev integration
-│       ├── openai.ts           ← GPT-4o/mini + Moderation API
-│       └── collector.ts        ← Collection orchestrator (async generator with SSE events)
-├── lib/types.ts                 ← Shared constants, labels, utilities
-└── components/ui/               ← shadcn/ui components
-tests/
-├── deduplication.test.ts        ← Post dedup across runs and queries
-├── jev-parser.test.ts           ← Jev output parsing and urgency normalization
-├── query-generation.test.ts     ← Keyword → Reddit search query expansion
-└── guardrails.test.ts           ← Zod schema validation and input checks
+Scheduler or Run button
+        |
+        v
+Search queue, one at a time ---> saves new posts as "pending"
+   A rate limit pauses only this.          |
+                                           v
+                        Classification, 5 posts at once
+                        A rate limit delays only that post.
+                                           |
+                                           v
+                        Author profiles, after the searches finish
 ```
+
+| Where | What |
+|---|---|
+| `src/server/services/collector.ts` | Runs the search and classification tracks for one run |
+| `src/server/services/search-queue.ts` | The durable queue, waits and crash recovery |
+| `src/server/services/scheduler.ts` | Decides which session is due |
+| `src/server/services/classifier.ts` | Jev questions and scoring |
+| `src/server/services/authors.ts` | Author profile lookups |
+| `src/server/services/reddit/` | ScrapeBadger and the official Reddit API |
+| `src/app/_components/` | Screens |
+| `src/components/` | Shared UI, as atoms, molecules, organisms and templates |
+| `tests/e2e/` | The end-to-end test and its stand-in services |
 
 ## License
 
