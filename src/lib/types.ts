@@ -18,15 +18,6 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   other: "Other",
 };
 
-export const CATEGORY_EMOJI: Record<Category, string> = {
-  complaint: "😤",
-  bug_report: "🐛",
-  product_idea: "💡",
-  praise: "⭐",
-  recommendation_ask: "🔍",
-  other: "📝",
-};
-
 export const SENTIMENTS = ["positive", "negative", "neutral"] as const;
 export type Sentiment = (typeof SENTIMENTS)[number];
 
@@ -36,18 +27,28 @@ export const SENTIMENT_LABELS: Record<Sentiment, string> = {
   neutral: "Neutral",
 };
 
-export const SENTIMENT_EMOJI: Record<Sentiment, string> = {
-  positive: "😊",
-  negative: "😠",
-  neutral: "😐",
+export const AUDIENCE_TAGS = [
+  "customer",
+  "competitor_customer",
+  "potential_customer",
+  "former_customer",
+  "unrelated",
+] as const;
+export type AudienceTag = (typeof AUDIENCE_TAGS)[number];
+
+export const AUDIENCE_LABELS: Record<AudienceTag, string> = {
+  customer: "Customer",
+  competitor_customer: "Competitor's customer",
+  potential_customer: "Potential customer",
+  former_customer: "Former customer",
+  unrelated: "Not a buyer",
 };
 
 export function getUrgencyColor(urgency: number): string {
-  if (urgency >= 5) return "text-red-600 bg-red-100";
-  if (urgency >= 4) return "text-orange-600 bg-orange-100";
-  if (urgency >= 3) return "text-yellow-600 bg-yellow-100";
-  if (urgency >= 2) return "text-blue-600 bg-blue-100";
-  return "text-gray-600 bg-gray-100";
+  if (urgency >= 5) return "badge-error";
+  if (urgency >= 4) return "badge-warning";
+  if (urgency >= 3) return "badge-info";
+  return "badge-ghost";
 }
 
 export function getUrgencyLabel(urgency: number): string {

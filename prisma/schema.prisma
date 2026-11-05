@@ -8,9 +8,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// One monitoring session. Each session has its own brief, searches, and saved posts.
 model Company {
   id        String   @id @default(cuid())
   name      String
+  /// Label shown in the session list. Falls back to the company name.
+  sessionName String @default("")
+  /// What they sell, in their words. Software, furniture, parts, anything.
+  product   String   @default("")
+  /// Who buys or uses it.
+  buyer     String   @default("")
+  /// What a post must show to be worth the team's time. Written by the user, never assumed.
+  keepWhen  String   @default("")
+  /// Subjects that share words with the product but must be skipped. Written by the user.
+  notAbout  String   @default("")
+  /// JSON list of what this session looks for. Empty means everything.
+  goals     String   @default("[]")
+  /// Whether the schedule collects this session. Empty on older sessions, which collect only while they are the one open.
+  autoCollect Boolean?
+  /// When someone last looked at this session's feed. Posts classified after this count as new.
+  lastSeenAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -19,6 +36,8 @@ model Company {
   collectionRuns CollectionRun[]
   chatMessages   ChatMessage[]
   searchQueries  SearchQuery[]
+  posts          RedditPost[]
+  classificationLogs ClassificationLog[]
 }
 
 model Keyword {
@@ -28,6 +47,8 @@ model Keyword {
   type      String   // "brand" | "competitor" | "topic"
   value     String
   aliases   String   @default("[]") // JSON array of alias strings
+  /// The name is also an everyday word, so its search needs a niche word beside it.
+  ambiguous Boolean  @default(false)
   createdAt DateTime @default(now())
 
   postKeywords PostKeyword[]
@@ -59,21 +80,74 @@ model SearchQuery {
   @@index([companyId])
 }
 
+model RedditAuthor {
+  id               String    @id @default(cuid())
+  username         String    @unique
+  fullname         String?
+  /// The name on their profile, when they set one.
+  displayName      String?
+  linkKarma        Int?
+  commentKarma     Int?
+  awardeeKarma     Int?
+  awarderKarma     Int?
+  totalKarma       Int?
+  createdUtc       DateTime?
+  isGold           Boolean?
+  isEmployee       Boolean?
+  isMod            Boolean?
+  verified         Boolean?
+  hasVerifiedEmail Boolean?
+  iconUrl          String?
+  /// Complete profile payload from the provider.
+  rawJson          String    @default("")
+  /// Set when a profile lookup finished, including "user not found".
+  fetchedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  posts RedditPost[]
+}
+
 model RedditPost {
   id        String   @id @default(cuid())
-  redditId  String   @unique
+  /// The session that saved this post. The same Reddit post can be judged separately per session.
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  redditId  String
   title     String
   body      String   @default("")
   subreddit String
   author    String
+  authorFullname String?
+  authorProfileId String?
+  authorProfile   RedditAuthor? @relation(fields: [authorProfileId], references: [id])
   url       String
   permalink String
   redditScore  Int   @default(0)
   numComments  Int   @default(0)
+  ups          Int?
+  upvoteRatio  Float?
+  numCrossposts Int?
+  totalAwards  Int?
   isSelf       Boolean @default(true)
+  isNsfw       Boolean?
+  isSpoiler    Boolean?
+  isStickied   Boolean?
+  locked       Boolean?
+  archived     Boolean?
+  flair        String?
+  domain       String?
+  searchSnippet String?
+  subredditId  String?
+  /// The first search that found this post.
+  matchedQuery String?
+  /// JSON array of every search that found this post.
+  matchedQueries String @default("[]")
+  /// Complete post payload from the provider. Nothing from the response is dropped.
+  rawJson      String   @default("")
   redditCreatedAt DateTime
 
-  // Classification results
+  // Classification results — saved for relevant and filtered posts
   isRelevant     Boolean? // null = not yet classified
   relevanceScore Float?   // Jev noul 0-1
   category       String?  // complaint | bug_report | product_idea | praise | recommendation_ask | other
@@ -82,7 +156,12 @@ model RedditPost {
   sentimentConfidence Float?
   urgency        Int?     // 1-5
   urgencyRaw     Float?   // Jev score 0-4
-  reason         String?  // GPT-4o-mini one-liner
+  /// Failed classification attempts. After 3 the post is marked "error".
+  classifyAttempts Int @default(0)
+  /// A classifier rate limited this post. It is not tried again before this time, and no other post waits for it.
+  classifyRetryAt DateTime?
+  reason         String?  // GPT-4o-mini one-liner, relevant posts only
+  audienceTag    String?  // customer | competitor_customer | potential_customer | former_customer | unrelated
 
   // Status
   status    String @default("pending") // pending | new | handled | dismissed
@@ -91,7 +170,12 @@ model RedditPost {
   updatedAt    DateTime @updatedAt
 
   postKeywords PostKeyword[]
+  classificationLogs ClassificationLog[]
 
+  @@unique([companyId, redditId])
+  @@index([companyId, status])
+  @@index([companyId, author])
+  @@index([companyId, classifiedAt])
   @@index([status])
   @@index([isRelevant])
   @@index([category])
@@ -115,7 +199,7 @@ model CollectionRun {
   id          String    @id @default(cuid())
   companyId   String
   company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  status      String    @default("running") // running | completed | failed
+  status      String    @default("running") // queued | running | completed | failed
   startedAt   DateTime  @default(now())
   completedAt DateTime?
 
@@ -126,10 +210,50 @@ model CollectionRun {
   totalFiltered   Int @default(0)
   errorCount      Int @default(0)
 
-  logs CollectionLog[]
+  /// Touched every few seconds while a worker owns the run. A running run with an old heartbeat is dead.
+  heartbeatAt DateTime?
+  /// Times this run was paused and put back on the queue with no search finishing in between. Capped so a crash loop ends.
+  resumeCount Int @default(0)
+  /// The source told the queue to wait. No search starts before this time, even after a restart.
+  waitingUntil DateTime?
+  /// Why the queue is waiting, in words shown to the user.
+  waitReason   String?
+
+  logs     CollectionLog[]
+  searches CollectionSearch[]
 
   @@index([companyId])
   @@index([status])
+}
+
+/// One queue message per search. The same query is never fetched twice inside a run.
+model CollectionSearch {
+  id             String    @id @default(cuid())
+  runId          String
+  run            CollectionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  companyId      String
+  query          String
+  /// pending | running | waiting | done | failed | skipped
+  /// "waiting" means the source turned this search away and it runs next once the wait is over.
+  status         String    @default("pending")
+  fetchedCount   Int       @default(0)
+  newCount       Int       @default(0)
+  duplicateCount Int       @default(0)
+  relevantCount  Int       @default(0)
+  filteredCount  Int       @default(0)
+  error          String?
+  attempts       Int       @default(0)
+  /// Times the source turned this search away. Sets how long the next wait is.
+  waitCount      Int       @default(0)
+  /// Times the source failed on this search. Capped, because a search that always breaks must not hold the queue forever.
+  outageCount    Int       @default(0)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([runId, query])
+  @@index([companyId, status])
+  @@index([runId, status])
 }
 
 model CollectionLog {
@@ -143,21 +267,64 @@ model CollectionLog {
   @@index([runId])
 }
 
+/// Every onboarding turn: what the user said, what Radarr asked, and what it understood.
 model ChatMessage {
   id        String   @id @default(cuid())
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  /// Groups the turns of one onboarding chat before its session exists.
+  draftId   String?
   role      String   // user | assistant | system
   content   String
-  metadata  String?  // JSON for config snapshots, errors, etc.
+  /// initial | clarifying | confirming | complete | blocked
+  phase     String?
+  metadata  String?  // JSON: extracted config, missing answers, pipeline steps, errors
   createdAt DateTime @default(now())
 
   @@index([companyId])
+  @@index([draftId])
+}
+
+/// One row per classification: the exact claim scored, every answer, and the verdict.
+model ClassificationLog {
+  id             String     @id @default(cuid())
+  companyId      String
+  company        Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  postId         String
+  post           RedditPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  runId          String?
+  keywordTracked String
+  /// The relevance statement Jev scored.
+  claim          String
+  /// The post text and brief Jev read.
+  state          String
+  threshold      Float
+  relevanceScore Float?
+  isRelevant     Boolean?
+  category       String?
+  categoryConfidence Float?
+  sentiment      String?
+  urgencyRaw     Float?
+  audience       String?
+  reason         String?
+  /// Full Jev answers, including probabilities.
+  answersJson    String     @default("")
+  error          String?
+  createdAt      DateTime   @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([postId])
 }
 
 model AppSettings {
   id                      String @id @default("default")
   collectionIntervalMins  Int    @default(30)
+  /// When false the scheduler never starts a run. Runs started with the button still work.
+  autoCollectEnabled      Boolean @default(true)
+  /// When false no paid profile lookups are sent. Profiles already saved still show.
+  authorLookupsEnabled    Boolean @default(true)
+  /// The most paid profile lookups in one run.
+  authorLookupsPerRun     Int    @default(25)
   relevanceThreshold      Float  @default(0.6)
   isOnboardingComplete    Boolean @default(false)
   activeCompanyId         String?

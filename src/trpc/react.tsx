@@ -7,7 +7,8 @@ import { type inferRouterInputs, type inferRouterOutputs } from "@trpc/server";
 import { useState } from "react";
 import SuperJSON from "superjson";
 
-import { type AppRouter } from "~/server/api/root";
+import { isConnectionFailure } from "@/lib/trpc-error";
+import { type AppRouter } from "@/server/api/root";
 import { createQueryClient } from "./query-client";
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
@@ -45,9 +46,15 @@ export function TRPCReactProvider(props: { children: React.ReactNode }) {
     api.createClient({
       links: [
         loggerLink({
-          enabled: (op) =>
-            process.env.NODE_ENV === "development" ||
-            (op.direction === "down" && op.result instanceof Error),
+          // The page polls, so a restart would log an error every few seconds.
+          // The app already tells the user when the server cannot be reached.
+          enabled: (op) => {
+            if (op.direction === "down" && isConnectionFailure(op.result)) return false;
+            return (
+              process.env.NODE_ENV === "development" ||
+              (op.direction === "down" && op.result instanceof Error)
+            );
+          },
         }),
         httpBatchStreamLink({
           transformer: SuperJSON,
