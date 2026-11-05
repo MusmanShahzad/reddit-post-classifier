@@ -1,245 +1,183 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { api } from "~/trpc/react";
-import { Card } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
-import { ScrollArea } from "~/components/ui/scroll-area";
-import { CATEGORY_LABELS, CATEGORY_EMOJI, type Category } from "~/lib/types";
+import { useState, useCallback, useEffect, useRef } from "react";
+import {
+  Ban,
+  CheckCheck,
+  CircleAlert,
+  CircleCheck,
+  CircleHelp,
+  Clock3,
+  Flame,
+  Layers,
+} from "lucide-react";
+import { api } from "@/trpc/react";
+import { StatCard, DashboardSkeleton } from "@/components/atoms";
+import {
+  CategoryBreakdown,
+  CollectionStatusPanel,
+  ActivityLog,
+  FilterQualityCard,
+  SearchQueueTable,
+} from "@/components/organisms";
+import { BriefEditor } from "./brief-editor";
 
-interface CollectionEvent {
-  type: string;
-  message: string;
-  stats?: {
-    totalFetched: number;
-    totalNew: number;
-    totalClassified: number;
-    totalRelevant: number;
-    totalFiltered: number;
-    errorCount: number;
-  };
-}
+const RUN_POLL_MS = 1500;
+const STATS_POLL_MS = 2000;
 
-export function Dashboard() {
-  const { data: stats, refetch: refetchStats } = api.post.getStats.useQuery();
-  const { data: lastRun } = api.collector.getLastRun.useQuery();
-  const { data: activity } = api.post.getRecentActivity.useQuery({ limit: 15 });
+export function Dashboard({ onOpenReview }: { onOpenReview?: () => void }) {
+  const utils = api.useUtils();
+  const { data: lastRun, isLoading: runLoading } = api.collector.getLastRun.useQuery(undefined, {
+    // A queued run is about to continue, so keep watching it too.
+    refetchInterval: (query) =>
+      query.state.data?.status === "running" || query.state.data?.status === "queued" ? RUN_POLL_MS : false,
+  });
+  const isCollecting = lastRun?.status === "running";
 
-  const [isCollecting, setIsCollecting] = useState(false);
-  const [liveEvents, setLiveEvents] = useState<CollectionEvent[]>([]);
+  const { data: stats, isLoading: statsLoading } = api.post.getStats.useQuery(undefined, {
+    refetchInterval: isCollecting ? STATS_POLL_MS : false,
+  });
+  const { data: activity, isLoading: activityLoading } = api.post.getRecentActivity.useQuery(
+    { limit: 200 },
+    { refetchInterval: isCollecting ? STATS_POLL_MS : false },
+  );
+  const { data: quality } = api.post.getFilterQuality.useQuery(undefined, {
+    refetchInterval: isCollecting ? STATS_POLL_MS : false,
+  });
+  const { data: schedule } = api.collector.getSchedule.useQuery(undefined, {
+    refetchInterval: isCollecting ? RUN_POLL_MS : 15000,
+  });
+
+  const [isStarting, setIsStarting] = useState(false);
+  const [editingBrief, setEditingBrief] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const [queuedNotice, setQueuedNotice] = useState<string | null>(null);
+
+  const previousStatus = useRef(lastRun?.status);
+  useEffect(() => {
+    if (previousStatus.current === "running" && lastRun?.status !== "running") {
+      void utils.post.invalidate();
+    }
+    previousStatus.current = lastRun?.status;
+  }, [lastRun?.status, utils]);
 
   const startCollection = useCallback(async () => {
-    setIsCollecting(true);
-    setLiveEvents([]);
-
+    setIsStarting(true);
+    setStartError(null);
     try {
       const response = await fetch("/api/collect", { method: "POST" });
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) return;
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const event = JSON.parse(line.slice(6)) as CollectionEvent;
-              setLiveEvents((prev) => [...prev, event]);
-            } catch {
-              // Skip malformed lines
-            }
-          }
-        }
+      const body = (await response.json().catch(() => null)) as { error?: string; queued?: boolean } | null;
+      if (!response.ok) {
+        setStartError(body?.error ?? "Collection did not start");
+        return;
       }
+      setQueuedNotice(
+        body?.queued
+          ? "This run is queued. It starts when the current collection finishes."
+          : null,
+      );
     } catch (error) {
-      setLiveEvents((prev) => [
-        ...prev,
-        {
-          type: "error",
-          message: `Connection error: ${error instanceof Error ? error.message : "Unknown"}`,
-        },
-      ]);
+      setStartError(`Connection error: ${error instanceof Error ? error.message : "Unknown"}`);
     } finally {
-      setIsCollecting(false);
-      void refetchStats();
+      await utils.collector.invalidate();
+      setIsStarting(false);
     }
-  }, [refetchStats]);
+  }, [utils]);
 
-  const totalRelevant = stats?.relevant ?? 0;
+  if (statsLoading || runLoading || activityLoading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="space-y-6 py-4">
       {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Total Posts" value={stats?.total ?? 0} icon="📊" />
-        <StatCard label="Relevant" value={stats?.relevant ?? 0} icon="✅" color="text-green-600" />
-        <StatCard label="Filtered" value={stats?.filtered ?? 0} icon="🚫" color="text-gray-400" />
-        <StatCard label="Urgent (4+)" value={stats?.urgent ?? 0} icon="🔴" color="text-red-600" />
-        <StatCard label="Pending" value={stats?.pending ?? 0} icon="📝" color="text-blue-600" />
-        <StatCard label="Handled" value={stats?.handled ?? 0} icon="✓" color="text-green-500" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+        <StatCard label="Total Posts" value={stats?.total ?? 0} icon={<Layers className="size-4" aria-hidden />} />
+        <StatCard label="Relevant" value={stats?.relevant ?? 0} icon={<CircleCheck className="size-4" aria-hidden />} />
+        <StatCard label="To check" value={stats?.review ?? 0} icon={<CircleHelp className="size-4" aria-hidden />} />
+        <StatCard label="Filtered" value={stats?.filtered ?? 0} icon={<Ban className="size-4" aria-hidden />} />
+        <StatCard label="Urgent (4+)" value={stats?.urgent ?? 0} icon={<Flame className="size-4" aria-hidden />} />
+        <StatCard label="Unclassified" value={stats?.pending ?? 0} icon={<Clock3 className="size-4" aria-hidden />} />
+        <StatCard label="Handled" value={stats?.handled ?? 0} icon={<CheckCheck className="size-4" aria-hidden />} />
       </div>
+
+      {startError && (
+        <div role="alert" className="alert alert-error alert-soft animate-rise-in">
+          <CircleAlert className="size-4" aria-hidden />
+          <span>{startError}</span>
+        </div>
+      )}
+
+      {queuedNotice && (
+        <div role="status" className="alert alert-soft animate-rise-in">
+          <Clock3 className="size-4" aria-hidden />
+          <span>{queuedNotice}</span>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Category breakdown */}
-        <Card className="p-5">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">
-            Category Breakdown
-          </h3>
-          <div className="space-y-3">
-            {stats?.categories.map((c) => (
-              <div key={c.category} className="flex items-center gap-3">
-                <span className="w-6 text-center">
-                  {CATEGORY_EMOJI[c.category as Category] ?? "📝"}
-                </span>
-                <span className="w-28 text-sm font-medium text-gray-700">
-                  {CATEGORY_LABELS[c.category as Category] ?? c.category}
-                </span>
-                <div className="flex-1">
-                  <div className="h-3 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-red-400 transition-all"
-                      style={{
-                        width: `${totalRelevant > 0 ? (c.count / totalRelevant) * 100 : 0}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-                <span className="w-12 text-right text-sm text-gray-500">
-                  {c.count}
-                </span>
-              </div>
-            ))}
-            {(!stats?.categories || stats.categories.length === 0) && (
-              <p className="text-sm text-gray-400">
-                No data yet. Run a collection first.
-              </p>
-            )}
-          </div>
-        </Card>
-
-        {/* Collection status & controls */}
-        <Card className="p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900">
-              Collection Status
-            </h3>
-            {lastRun && (
-              <Badge variant={lastRun.status === "completed" ? "default" : "destructive"}>
-                {lastRun.status}
-              </Badge>
-            )}
-          </div>
-
-          {lastRun && (
-            <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-              <div className="text-gray-500">Last run:</div>
-              <div className="font-medium">
-                {new Date(lastRun.startedAt).toLocaleString()}
-              </div>
-              <div className="text-gray-500">Posts found:</div>
-              <div className="font-medium">{lastRun.totalFetched}</div>
-              <div className="text-gray-500">New posts:</div>
-              <div className="font-medium">{lastRun.totalNew}</div>
-              <div className="text-gray-500">Relevant:</div>
-              <div className="font-medium text-green-600">
-                {lastRun.totalRelevant}
-              </div>
-            </div>
-          )}
-
-          <Button
-            onClick={() => void startCollection()}
-            disabled={isCollecting}
-            className="w-full bg-red-500 hover:bg-red-600"
-          >
-            {isCollecting ? "⏳ Collecting..." : "🔄 Run Collection Now"}
-          </Button>
-        </Card>
+        <CategoryBreakdown
+          categories={stats?.categories ?? []}
+          totalRelevant={stats?.relevant ?? 0}
+        />
+        <CollectionStatusPanel
+          lastRun={lastRun ? {
+            status: lastRun.status,
+            startedAt: lastRun.startedAt,
+            totalFetched: lastRun.totalFetched,
+            totalNew: lastRun.totalNew,
+            totalRelevant: lastRun.totalRelevant,
+            waitingUntil: lastRun.waitingUntil,
+          } : null}
+          isCollecting={isCollecting || isStarting}
+          onRunCollection={() => void startCollection()}
+          schedule={schedule ?? null}
+        />
       </div>
 
-      {/* Live events / Activity log */}
-      <Card className="p-5">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          {isCollecting ? "🔴 Live Collection Progress" : "📋 Recent Activity"}
-        </h3>
-        <ScrollArea className="h-64">
-          <div className="space-y-2">
-            {isCollecting &&
-              liveEvents.map((event, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 text-sm ${
-                    event.type === "error"
-                      ? "text-red-600"
-                      : event.type === "completed"
-                        ? "text-green-600 font-medium"
-                        : "text-gray-600"
-                  }`}
-                >
-                  <span className="mt-0.5 text-xs text-gray-400">
-                    {new Date().toLocaleTimeString()}
-                  </span>
-                  <span>{event.message}</span>
-                </div>
-              ))}
+      <FilterQualityCard
+        quality={quality ?? null}
+        reviewCount={stats?.review ?? 0}
+        onOpenReview={onOpenReview}
+        onCompleteBrief={() => setEditingBrief(true)}
+      />
+      {editingBrief && <BriefEditor onClose={() => setEditingBrief(false)} />}
 
-            {!isCollecting &&
-              activity?.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-start gap-2 text-sm text-gray-600"
-                >
-                  <span className="mt-0.5 text-xs text-gray-400">
-                    {new Date(log.timestamp).toLocaleTimeString()}
-                  </span>
-                  <Badge variant="outline" className="text-xs">
-                    {log.type}
-                  </Badge>
-                  <span>{log.message}</span>
-                </div>
-              ))}
+      <SearchQueueTable
+        title="Search queue"
+        empty="Each search shows up here with how many posts it fetched."
+        rows={(lastRun?.searches ?? []).map((search) => ({
+          id: search.id,
+          query: search.query,
+          status: search.status,
+          fetchedCount: search.fetchedCount,
+          newCount: search.newCount,
+          duplicateCount: search.duplicateCount,
+          relevantCount: search.relevantCount,
+          filteredCount: search.filteredCount,
+          error: search.error,
+        }))}
+      />
 
-            {!isCollecting && (!activity || activity.length === 0) && (
-              <p className="text-sm text-gray-400">
-                No activity yet. Click &quot;Run Collection Now&quot; to start.
-              </p>
-            )}
-          </div>
-        </ScrollArea>
-      </Card>
+      <ActivityLog
+        isCollecting={isCollecting}
+        liveEvents={(lastRun?.logs ?? []).map((log) => ({
+          id: log.id,
+          type: log.type,
+          message: log.message,
+          timestamp: log.timestamp,
+          runId: lastRun?.id,
+          runStatus: lastRun?.status,
+        }))}
+        activity={(activity ?? []).map((log) => ({
+          id: log.id,
+          type: log.type,
+          message: log.message,
+          timestamp: log.timestamp,
+          runId: log.runId,
+          runStatus: log.run.status,
+        }))}
+      />
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: number;
-  icon: string;
-  color?: string;
-}) {
-  return (
-    <Card className="p-4">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{icon}</span>
-        <span className="text-xs font-medium text-gray-500">{label}</span>
-      </div>
-      <div className={`mt-1 text-2xl font-bold ${color ?? "text-gray-900"}`}>
-        {value}
-      </div>
-    </Card>
   );
 }

@@ -1,31 +1,50 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "~/trpc/react";
-import { Card } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Separator } from "~/components/ui/separator";
+import { api } from "@/trpc/react";
+import { droppedPosts } from "@/lib/search-stats";
+import { readableError } from "@/lib/trpc-error";
+import { SettingsSkeleton } from "@/components/atoms";
+import {
+  KeywordSection,
+  SubredditSection,
+  SearchQuerySection,
+} from "@/components/organisms";
+import { BriefEditor } from "./brief-editor";
 
 export function Settings() {
-  const { data: company, refetch } = api.settings.getCompany.useQuery();
-  const addKeyword = api.settings.addKeyword.useMutation({ onSuccess: () => void refetch() });
-  const deleteKeyword = api.settings.deleteKeyword.useMutation({ onSuccess: () => void refetch() });
-  const addSubreddit = api.settings.addSubreddit.useMutation({ onSuccess: () => void refetch() });
-  const removeSubreddit = api.settings.removeSubreddit.useMutation({ onSuccess: () => void refetch() });
-  const addCustomQuery = api.settings.addCustomQuery.useMutation({ onSuccess: () => void refetch() });
-  const deleteQuery = api.settings.deleteSearchQuery.useMutation({ onSuccess: () => void refetch() });
+  const { data: company, isLoading, refetch } = api.settings.getCompany.useQuery();
+  const [editingBrief, setEditingBrief] = useState(false);
+  const utils = api.useUtils();
+  // Tags drive the searches, so the tag table and the cost estimate change with them.
+  const refresh = () => {
+    void refetch();
+    void utils.settings.getTagPerformance.invalidate();
+    void utils.collector.getSchedule.invalidate();
+  };
+  const addKeyword = api.settings.addKeyword.useMutation({ onSuccess: refresh });
+  const deleteKeyword = api.settings.deleteKeyword.useMutation({ onSuccess: refresh });
+  const addSubreddit = api.settings.addSubreddit.useMutation({ onSuccess: refresh });
+  const removeSubreddit = api.settings.removeSubreddit.useMutation({ onSuccess: refresh });
+  const addCustomQuery = api.settings.addCustomQuery.useMutation({ onSuccess: refresh });
+  const deleteQuery = api.settings.deleteSearchQuery.useMutation({ onSuccess: refresh });
+  const editError = readableError(
+    addKeyword.error ??
+      deleteKeyword.error ??
+      addSubreddit.error ??
+      removeSubreddit.error ??
+      addCustomQuery.error ??
+      deleteQuery.error,
+  );
 
-  const [newKeyword, setNewKeyword] = useState({ type: "brand" as string, value: "" });
-  const [newSubreddit, setNewSubreddit] = useState("");
-  const [newQuery, setNewQuery] = useState("");
+  if (isLoading) {
+    return <SettingsSkeleton />;
+  }
 
   if (!company) {
     return (
-      <div className="py-12 text-center text-gray-500">
-        No company configured. Complete onboarding first.
+      <div className="py-12 text-center text-base-content/70">
+        No session yet. Start a new session from the sidebar.
       </div>
     );
   }
@@ -36,249 +55,357 @@ export function Settings() {
 
   return (
     <div className="space-y-6 py-4">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">Settings</h2>
-        <p className="text-sm text-gray-500">
-          Manage your monitoring configuration for{" "}
-          <span className="font-semibold">{company.name}</span>
-        </p>
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-lg font-bold">Settings</h2>
+          <p className="text-sm text-base-content/70">What is searched for {company.name}.</p>
+        </div>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          {[
+            { label: "Sells", value: company.product },
+            { label: "Find", value: company.keepWhen },
+            { label: "Buyers", value: company.buyer },
+            { label: "Skip", value: company.notAbout },
+          ].map((row) => (
+            <div key={row.label} className="contents">
+              <dt className="text-base-content/60">{row.label}</dt>
+              <dd className={row.value.trim() ? "" : "text-base-content/50"}>{row.value.trim() || "Not answered yet"}</dd>
+            </div>
+          ))}
+        </dl>
+        <button type="button" className="btn btn-sm" onClick={() => setEditingBrief(true)}>
+          {company.buyer.trim() && company.notAbout.trim() ? "Edit buyers and skip" : "Complete brief"}
+        </button>
+        {editingBrief && <BriefEditor onClose={() => setEditingBrief(false)} />}
       </div>
 
-      {/* Keywords */}
-      <Card className="p-5">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          🏷️ Brand Keywords
-        </h3>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {brands.map((kw) => (
-            <div key={kw.id} className="flex items-center gap-1">
-              <Badge variant="default">
-                {kw.value}
-                {JSON.parse(kw.aliases).length > 0 && (
-                  <span className="ml-1 opacity-70">
-                    ({(JSON.parse(kw.aliases) as string[]).join(", ")})
-                  </span>
-                )}
-              </Badge>
-              <button
-                onClick={() => deleteKeyword.mutate({ id: kw.id })}
-                className="text-xs text-red-400 hover:text-red-600"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+      {editError && (
+        <div role="alert" className="alert alert-error alert-soft">
+          <span>{editError}</span>
         </div>
+      )}
 
-        <Separator className="my-4" />
+      <ScheduleSection />
+      <AuthorLookupsSection />
+      <TagPerformance />
 
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          ⚔️ Competitors
-        </h3>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {competitors.map((kw) => (
-            <div key={kw.id} className="flex items-center gap-1">
-              <Badge variant="secondary">{kw.value}</Badge>
-              <button
-                onClick={() => deleteKeyword.mutate({ id: kw.id })}
-                className="text-xs text-red-400 hover:text-red-600"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+      <KeywordSection
+        brands={brands}
+        competitors={competitors}
+        topics={topics}
+        onDeleteKeyword={(id) => deleteKeyword.mutate({ id })}
+        onAddKeyword={(type, value) =>
+          addKeyword.mutate({ companyId: company.id, type, value })
+        }
+      />
+
+      <SubredditSection
+        subreddits={company.subreddits}
+        onRemove={(id) => removeSubreddit.mutate({ id })}
+        onAdd={(name) =>
+          addSubreddit.mutate({ companyId: company.id, name })
+        }
+      />
+
+      <SearchQuerySection
+        queries={company.searchQueries}
+        onDeleteQuery={(id) => deleteQuery.mutate({ id })}
+        onAddQuery={(query) =>
+          addCustomQuery.mutate({ companyId: company.id, query })
+        }
+      />
+    </div>
+  );
+}
+
+function TagPerformance() {
+  const { data } = api.settings.getTagPerformance.useQuery();
+  if (!data) return null;
+
+  return (
+    <div className="card card-border bg-base-100">
+      <div className="card-body">
+        <h3 className="card-title text-base">How tags are doing</h3>
+        <p className="text-sm text-base-content/70">
+          Strong tags bring relevant posts. Weak tags are fetched but almost none pass the filter.
+          Remove or replace a weak tag in the lists below, and the next run uses the new search.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="table table-sm">
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Type</th>
+                <th>Verdict</th>
+                <th>Fetched</th>
+                <th>New</th>
+                <th title="Passed the filter: in the feed, or held for your check">Kept</th>
+                <th>Filtered</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.keywords.map((keyword) => (
+                <tr key={keyword.id}>
+                  <td>{keyword.value}</td>
+                  <td>{keyword.type}</td>
+                  <td><VerdictBadge verdict={keyword.verdict} /></td>
+                  <td>{keyword.fetched}</td>
+                  <td>{keyword.fresh}</td>
+                  <td>{keyword.relevant}</td>
+                  <td>{keyword.filtered}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+        {data.queries.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="table table-sm">
+              <thead>
+                <tr>
+                  <th>Search</th>
+                  <th>Verdict</th>
+                  <th>Done</th>
+                  <th>Skipped</th>
+                  <th>Failed</th>
+                  <th>Fetched</th>
+                  <th>New</th>
+                  <th>Duplicates</th>
+                  <th title="The search returned these, but they never use the tracked name, so they were not kept">Dropped</th>
+                  <th title="Passed the filter: in the feed, or held for your check">Kept</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.queries.map((query) => (
+                  <tr key={query.query}>
+                    <td className="max-w-sm whitespace-normal"><code>{query.query}</code></td>
+                    <td><VerdictBadge verdict={query.verdict} /></td>
+                    <td>{query.done}</td>
+                    <td>{query.skipped}</td>
+                    <td>{query.failed}</td>
+                    <td>{query.fetched}</td>
+                    <td>{query.fresh}</td>
+                    <td>{query.duplicates}</td>
+                    <td>{droppedPosts({ fetchedCount: query.fetched, newCount: query.fresh, duplicateCount: query.duplicates })}</td>
+                    <td>{query.relevant}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-        <Separator className="my-4" />
+const VERDICTS: Record<string, { label: string; style: string; hint: string }> = {
+  strong: { label: "Strong", style: "badge-success", hint: "At least 1 in 5 new posts is relevant" },
+  mixed: { label: "Mixed", style: "badge-warning", hint: "Some relevant posts, mostly noise" },
+  weak: { label: "Weak", style: "badge-error", hint: "Many posts checked and none relevant" },
+  early: { label: "Too early", style: "badge-info", hint: "Fewer than 5 posts checked so far" },
+  empty: { label: "No posts", style: "badge-ghost", hint: "The search worked and found nothing" },
+  failed: { label: "Failing", style: "badge-error", hint: "Every attempt errored. Edit or remove it" },
+  not_run: { label: "Not run", style: "badge-ghost", hint: "Waiting for its first run" },
+};
 
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          🔍 Topics
-        </h3>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {topics.map((kw) => (
-            <div key={kw.id} className="flex items-center gap-1">
-              <Badge variant="outline">{kw.value}</Badge>
-              <button
-                onClick={() => deleteKeyword.mutate({ id: kw.id })}
-                className="text-xs text-red-400 hover:text-red-600"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
+function VerdictBadge({ verdict }: { verdict: string }) {
+  const info = VERDICTS[verdict] ?? VERDICTS.not_run!;
+  return (
+    <span className={`badge badge-sm ${info.style}`} title={info.hint}>
+      {info.label}
+    </span>
+  );
+}
 
-        <Separator className="my-4" />
+const DEFAULT_LOOKUPS_PER_RUN = 25;
 
-        {/* Add keyword */}
-        <div className="flex gap-2">
-          <select
-            value={newKeyword.type}
-            onChange={(e) =>
-              setNewKeyword((p) => ({ ...p, type: e.target.value }))
-            }
-            className="rounded-md border px-3 py-2 text-sm"
-          >
-            <option value="brand">Brand</option>
-            <option value="competitor">Competitor</option>
-            <option value="topic">Topic</option>
-          </select>
-          <Input
-            value={newKeyword.value}
-            onChange={(e) =>
-              setNewKeyword((p) => ({ ...p, value: e.target.value }))
-            }
-            placeholder="Add keyword..."
-            className="flex-1"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newKeyword.value.trim()) {
-                addKeyword.mutate({
-                  companyId: company.id,
-                  type: newKeyword.type as "brand" | "competitor" | "topic",
-                  value: newKeyword.value.trim(),
-                });
-                setNewKeyword((p) => ({ ...p, value: "" }));
-              }
-            }}
+function AuthorLookupsSection() {
+  const { data } = api.settings.getSettings.useQuery();
+  const { data: schedule } = api.collector.getSchedule.useQuery();
+  const utils = api.useUtils();
+  const [draft, setDraft] = useState<number | null>(null);
+  const update = api.settings.updateSettings.useMutation({
+    onSuccess: async () => {
+      await utils.settings.getSettings.invalidate();
+      setDraft(null);
+    },
+  });
+  const enabled = data?.authorLookupsEnabled !== false;
+  const perRun = draft ?? data?.authorLookupsPerRun ?? DEFAULT_LOOKUPS_PER_RUN;
+  const updateError = readableError(update.error);
+
+  return (
+    <div className="card card-border bg-base-100">
+      <div className="card-body">
+        <h3 className="card-title text-base">Author profiles</h3>
+        <p className="text-sm text-base-content/70">
+          Fetches the profile picture, name, karma, and account age of people behind relevant posts.
+          Each person is looked up once, for {schedule?.creditsPerLookup ?? 5} credits.
+          {enabled && ` At this limit a run spends at most ${(perRun || 0) * (schedule?.creditsPerLookup ?? 5)} credits on lookups, usually far fewer.`}
+        </p>
+        <label className="flex cursor-pointer items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="toggle"
+            aria-label="Look up author profiles"
+            checked={enabled}
+            disabled={update.isPending}
+            onChange={(event) => update.mutate({ authorLookupsEnabled: event.target.checked })}
           />
-          <Button
-            size="sm"
-            onClick={() => {
-              if (newKeyword.value.trim()) {
-                addKeyword.mutate({
-                  companyId: company.id,
-                  type: newKeyword.type as "brand" | "competitor" | "topic",
-                  value: newKeyword.value.trim(),
-                });
-                setNewKeyword((p) => ({ ...p, value: "" }));
-              }
-            }}
-            disabled={!newKeyword.value.trim()}
-          >
-            Add
-          </Button>
-        </div>
-      </Card>
+          <span>
+            Look up author profiles
+            <span className="block text-base-content/70">
+              {enabled
+                ? "New authors are looked up after each run's searches finish."
+                : "Off. No paid lookups are sent. Profiles already saved still show, and other authors show their username."}
+            </span>
+          </span>
+        </label>
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const next = Number.isFinite(perRun) ? Math.min(200, Math.max(1, Math.round(perRun))) : DEFAULT_LOOKUPS_PER_RUN;
+            update.mutate({ authorLookupsPerRun: next });
+          }}
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            Most lookups per run
+            <input
+              type="number"
+              min={1}
+              max={200}
+              className="input w-32"
+              value={perRun}
+              disabled={!enabled}
+              onChange={(event) => setDraft(Number(event.target.value))}
+            />
+          </label>
+          <button type="submit" className="btn" disabled={update.isPending || !enabled || draft === null}>
+            {update.isPending && <span className="loading loading-spinner loading-xs" />}
+            Save limit
+          </button>
+        </form>
+        {updateError && (
+          <div role="alert" className="alert alert-error alert-soft">
+            <span>{updateError}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
-      {/* Subreddits */}
-      <Card className="p-5">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          📍 Subreddits
-        </h3>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {company.subreddits.map((sub) => (
-            <div key={sub.id} className="flex items-center gap-1">
-              <Badge variant="outline">r/{sub.name}</Badge>
-              <button
-                onClick={() => removeSubreddit.mutate({ id: sub.id })}
-                className="text-xs text-red-400 hover:text-red-600"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <Input
-            value={newSubreddit}
-            onChange={(e) => setNewSubreddit(e.target.value)}
-            placeholder="Add subreddit..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newSubreddit.trim()) {
-                addSubreddit.mutate({
-                  companyId: company.id,
-                  name: newSubreddit.trim().replace(/^r\//, ""),
-                });
-                setNewSubreddit("");
-              }
-            }}
+function ScheduleSection() {
+  const { data } = api.settings.getSettings.useQuery();
+  const { data: schedule } = api.collector.getSchedule.useQuery();
+  const utils = api.useUtils();
+  const [draft, setDraft] = useState<number | null>(null);
+  const update = api.settings.updateSettings.useMutation({
+    onSuccess: async () => {
+      // Wait for fresh values before dropping the draft, so the field does not flicker.
+      await Promise.all([
+        utils.settings.getSettings.invalidate(),
+        utils.collector.getSchedule.invalidate(),
+      ]);
+      setDraft(null);
+    },
+  });
+  const minutes = draft ?? data?.collectionIntervalMins ?? 30;
+  const autoOn = data?.autoCollectEnabled !== false;
+  const { data: sessionList } = api.session.list.useQuery();
+  const thisSession = sessionList?.sessions.find((session) => session.id === sessionList.activeId);
+  const setAutoCollect = api.session.setAutoCollect.useMutation({
+    onSuccess: () =>
+      Promise.all([utils.session.list.invalidate(), utils.collector.getSchedule.invalidate()]),
+  });
+  const updateError = readableError(update.error ?? setAutoCollect.error);
+
+  return (
+    <div className="card card-border bg-base-100">
+      <div className="card-body">
+        <h3 className="card-title text-base">Collection schedule</h3>
+        <p className="text-sm text-base-content/70">
+          A collection runs in the background on this interval. If one is already
+          going, the next waits in a queue. Duplicate posts are skipped, every new
+          post is saved with its tags, and only relevant posts get a one-line summary.
+        </p>
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const next = Number.isFinite(minutes)
+              ? Math.min(1440, Math.max(5, Math.round(minutes)))
+              : 30;
+            update.mutate({ collectionIntervalMins: next });
+          }}
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            Minutes between runs
+            <input
+              type="number"
+              min={5}
+              max={1440}
+              className="input w-32"
+              value={minutes}
+              onChange={(event) => setDraft(Number(event.target.value))}
+            />
+          </label>
+          <button type="submit" className="btn" disabled={update.isPending}>
+            {update.isPending && <span className="loading loading-spinner loading-xs" />}
+            Save schedule
+          </button>
+        </form>
+        <label className="flex cursor-pointer items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            className="toggle"
+            checked={autoOn}
+            disabled={update.isPending}
+            onChange={(event) => update.mutate({ autoCollectEnabled: event.target.checked })}
           />
-          <Button
-            size="sm"
-            onClick={() => {
-              if (newSubreddit.trim()) {
-                addSubreddit.mutate({
-                  companyId: company.id,
-                  name: newSubreddit.trim().replace(/^r\//, ""),
-                });
-                setNewSubreddit("");
-              }
-            }}
-            disabled={!newSubreddit.trim()}
-          >
-            Add
-          </Button>
-        </div>
-      </Card>
-
-      {/* Search queries */}
-      <Card className="p-5">
-        <h3 className="mb-4 text-sm font-semibold text-gray-900">
-          🔎 Search Queries
-        </h3>
-        <div className="mb-3 space-y-1">
-          {company.searchQueries.map((sq) => (
-            <div
-              key={sq.id}
-              className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
-            >
-              <div className="flex items-center gap-2">
-                <code className="text-gray-700">{sq.query}</code>
-                {sq.isCustom && (
-                  <Badge variant="outline" className="text-xs">
-                    custom
-                  </Badge>
-                )}
-              </div>
-              {sq.isCustom && (
-                <button
-                  onClick={() => deleteQuery.mutate({ id: sq.id })}
-                  className="text-xs text-red-400 hover:text-red-600"
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <Label className="mb-2 block text-xs text-gray-500">
-          Auto-generated queries update when you change keywords. Custom queries
-          are preserved.
-        </Label>
-
-        <div className="flex gap-2">
-          <Input
-            value={newQuery}
-            onChange={(e) => setNewQuery(e.target.value)}
-            placeholder="Add custom search query..."
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newQuery.trim()) {
-                addCustomQuery.mutate({
-                  companyId: company.id,
-                  query: newQuery.trim(),
-                });
-                setNewQuery("");
-              }
-            }}
-          />
-          <Button
-            size="sm"
-            onClick={() => {
-              if (newQuery.trim()) {
-                addCustomQuery.mutate({
-                  companyId: company.id,
-                  query: newQuery.trim(),
-                });
-                setNewQuery("");
-              }
-            }}
-            disabled={!newQuery.trim()}
-          >
-            Add
-          </Button>
-        </div>
-      </Card>
+          <span>
+            Collect automatically
+            <span className="block text-base-content/70">
+              {autoOn
+                ? "Runs start on their own. Turn this off to stop spending credits."
+                : "Paused for every session. Nothing runs until you press Run collection on the dashboard."}
+            </span>
+          </span>
+        </label>
+        {thisSession && (
+          <label className="flex cursor-pointer items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="toggle"
+              checked={thisSession.autoCollect}
+              disabled={setAutoCollect.isPending || !autoOn}
+              onChange={(event) => setAutoCollect.mutate({ id: thisSession.id, enabled: event.target.checked })}
+            />
+            <span>
+              Include this session in the schedule
+              <span className="block text-base-content/70">
+                {thisSession.autoCollect
+                  ? "It collects on the schedule even while another session is open, and shows a badge when new posts arrive."
+                  : "It collects only when you press Run collection."}
+              </span>
+            </span>
+          </label>
+        )}
+        {schedule && schedule.searchesPerRun > 0 && (
+          <p className="text-sm text-base-content/70">
+            Each run of this session makes {schedule.searchesPerRun} {schedule.searchesPerRun === 1 ? "search" : "searches"}, at most{" "}
+            {schedule.creditsPerRun.toLocaleString()} credits. {autoOn ? "At this interval that is at most " : "If it ran at this interval it would be at most "}
+            {schedule.creditsPerDay.toLocaleString()} credits a day. A search that finds nothing costs nothing. Author lookups cost extra.
+          </p>
+        )}
+        {updateError && (
+          <div role="alert" className="alert alert-error alert-soft">
+            <span>{updateError}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

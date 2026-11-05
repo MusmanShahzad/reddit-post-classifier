@@ -1,49 +1,44 @@
 import { NextResponse } from "next/server";
-import { db } from "~/server/db";
-import { runCollection } from "~/server/services/collector";
+import { isSameSiteRequest } from "@/lib/request-guard";
+import { db } from "@/server/db";
+import { enqueueCollection } from "@/server/services/collection-runs";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
-  const settings = await db.appSettings.findUnique({
-    where: { id: "default" },
-  });
-
-  if (!settings?.activeCompanyId) {
-    return NextResponse.json(
-      { error: "No company configured. Complete onboarding first." },
-      { status: 400 },
-    );
+export async function POST(request: Request) {
+  // A run spends paid credits, so a page on another site must not be able to start one.
+  if (!isSameSiteRequest(request.headers)) {
+    return NextResponse.json({ error: "Cross-site requests are not allowed." }, { status: 403 });
   }
 
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const event of runCollection(db, settings.activeCompanyId!)) {
-          const data = `data: ${JSON.stringify(event)}\n\n`;
-          controller.enqueue(encoder.encode(data));
-        }
-      } catch (error) {
-        const errorEvent = `data: ${JSON.stringify({
-          type: "error",
-          error: error instanceof Error ? error.message : "Unknown error",
-          message: "Collection failed",
-        })}\n\n`;
-        controller.enqueue(encoder.encode(errorEvent));
-      } finally {
-        controller.close();
-      }
-    },
-  });
+  try {
+    const settings = await db.appSettings.findUnique({
+      where: { id: "default" },
+    });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+    if (!settings?.activeCompanyId) {
+      return NextResponse.json(
+        { error: "No company configured. Complete onboarding first." },
+        { status: 400 },
+      );
+    }
+
+    const result = await enqueueCollection(db, settings.activeCompanyId);
+
+    return NextResponse.json(
+      {
+        runId: result.runId,
+        queued: result.queued,
+      },
+      { status: 202 },
+    );
+  } catch (error) {
+    console.error(
+      "[collect] could not start a run:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+    return NextResponse.json({ error: "Could not start the collection." }, { status: 500 });
+  }
 }
 
 export async function GET() {
