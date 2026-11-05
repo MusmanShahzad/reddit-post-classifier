@@ -15,6 +15,7 @@ export const env = createEnv({
     OPENAI_API_KEY: z.string().min(1),
     COLLECTION_INTERVAL_MINUTES: z.coerce.number().default(30),
     RELEVANCE_THRESHOLD: z.coerce.number().default(0.7),
+    MAX_POSTS_PER_SEARCH: z.coerce.number().int().min(1).max(100).optional(),
   },
   client: {},
   runtimeEnv: {
@@ -28,6 +29,7 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     COLLECTION_INTERVAL_MINUTES: process.env.COLLECTION_INTERVAL_MINUTES,
     RELEVANCE_THRESHOLD: process.env.RELEVANCE_THRESHOLD,
+    MAX_POSTS_PER_SEARCH: process.env.MAX_POSTS_PER_SEARCH,
   },
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   emptyStringAsUndefined: true,

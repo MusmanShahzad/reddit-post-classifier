@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Runs the real collector against a temp database. Reddit, the classifier
@@ -566,6 +566,28 @@ describe("widening an empty topic search", () => {
     await collect();
 
     expect(mocks.searchReddit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the limit on posts per search", () => {
+  afterEach(() => {
+    collectorConfig.maxPostsPerSearch = 100;
+  });
+
+  it("has no limit by default", async () => {
+    results = { '"Alpha"': Array.from({ length: 12 }, (_, i) => post(`p${i}`, "good")) };
+    await collect();
+    expect(mocks.searchReddit.mock.calls[0]?.[1]).toMatchObject({ limit: 100 });
+    expect(await db.redditPost.count()).toBe(12);
+  });
+
+  it("keeps only that many posts when one is set", async () => {
+    collectorConfig.maxPostsPerSearch = 7;
+    results = { '"Alpha"': Array.from({ length: 12 }, (_, i) => post(`p${i}`, "good")) };
+    await collect();
+    expect(mocks.searchReddit.mock.calls[0]?.[1]).toMatchObject({ limit: 7 });
+    expect(await db.redditPost.count()).toBe(7);
+    expect(search(await latestRun(), '"Alpha"')).toMatchObject({ fetchedCount: 7, newCount: 7 });
   });
 });
 

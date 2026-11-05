@@ -19,6 +19,7 @@
  * @module services/collector
  */
 
+import { env } from "@/env";
 import type { db as dbType } from "@/server/db";
 type PrismaClient = typeof dbType;
 import {
@@ -58,6 +59,8 @@ export const collectorConfig = {
   classifyConcurrency: 5,
   /** How often classification looks for newly saved posts while it has room. */
   classifyPollMs: 1000,
+  /** The most posts kept from one search. 100 is the most a provider returns, so by default there is no limit. */
+  maxPostsPerSearch: env.MAX_POSTS_PER_SEARCH ?? 100,
 };
 
 /** A post that fails to classify this many times is marked "error" and left alone. */
@@ -478,11 +481,11 @@ async function* runSearchJob(
         // Sorting by newest filled the slots with passing mentions from the last day.
         sort: "relevance",
         timeframe,
-        limit: 100,
+        limit: collectorConfig.maxPostsPerSearch,
         subreddits: searchIn,
         // The queue does its own waiting, so a limit shows up at once.
         retryThrottles: false,
-      });
+      }).then((found) => found.slice(0, collectorConfig.maxPostsPerSearch));
 
     // Some markets have too few posts for any one week. An empty search costs
     // nothing, so a topic widens until it first finds something, then looks only

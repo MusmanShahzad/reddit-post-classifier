@@ -16,6 +16,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "@/server/api/trpc";
 import { keepBuyerCommunities, readGoals } from "@/server/services/classifier";
+import { enqueueCollection } from "@/server/services/collection-runs";
 import { answerTurn, logTurn, TurnInputSchema } from "@/server/services/onboarding-turn";
 import { buildSearchQueries, searchSubreddits, subredditQueries } from "@/server/services/reddit";
 
@@ -78,7 +79,7 @@ export const onboardingRouter = createTRPCRouter({
       });
 
       // All or nothing, so a failed save never leaves an empty session behind.
-      return ctx.db.$transaction(async (tx) => {
+      const saved = await ctx.db.$transaction(async (tx) => {
         const company = await tx.company.create({
           data: {
             name: input.companyName,
@@ -166,6 +167,16 @@ export const onboardingRouter = createTRPCRouter({
 
         return { companyId: company.id, queriesGenerated: allQueries.length };
       });
+
+      // The first search starts now, unless automatic collection is switched off.
+      // The session is already saved, so if this fails the schedule picks it up.
+      const settings = await ctx.db.appSettings.findUnique({ where: { id: "default" } });
+      if (settings?.autoCollectEnabled !== false) {
+        await enqueueCollection(ctx.db, saved.companyId).catch((error: unknown) => {
+          console.warn(`[setup] first search did not start: ${error instanceof Error ? error.message : "Unknown"}`);
+        });
+      }
+      return saved;
     }),
 
   /**

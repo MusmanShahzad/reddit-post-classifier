@@ -2,6 +2,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 // getSchedule starts the real scheduler, which would tick against the real database.
 vi.mock("@/server/services/scheduler", () => ({ startScheduler: () => undefined }));
+const enqueueCollection = vi.hoisted(() => vi.fn(async () => ({ ok: true, runId: "run", queued: false })));
+vi.mock("@/server/services/collection-runs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/services/collection-runs")>()),
+  enqueueCollection,
+}));
 vi.mock("@/server/services/classifier", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/services/classifier")>()),
   readGoals: async () => ["own_feedback"],
@@ -64,6 +69,37 @@ async function savePost(redditId: string, data: Record<string, unknown> = {}) {
     },
   });
 }
+
+describe("the first search of a new session", () => {
+  const brief = {
+    product: "standing desks",
+    keepWhen: "bad reviews",
+    brandKeywords: [{ value: "Deskly", aliases: [] }],
+    competitorKeywords: [],
+    topicKeywords: [],
+    subreddits: [],
+  };
+
+  beforeEach(() => enqueueCollection.mockClear());
+
+  it("starts as soon as the session is saved", async () => {
+    const { companyId: created } = await onboarding().saveConfig({ companyName: "Deskly", ...brief });
+    expect(enqueueCollection).toHaveBeenCalledTimes(1);
+    expect(enqueueCollection).toHaveBeenCalledWith(expect.anything(), created);
+  });
+
+  it("does not start with automatic collection switched off", async () => {
+    await settings().updateSettings({ autoCollectEnabled: false });
+    await onboarding().saveConfig({ companyName: "Deskly", ...brief });
+    expect(enqueueCollection).not.toHaveBeenCalled();
+  });
+
+  it("still saves the session if the search cannot start", async () => {
+    enqueueCollection.mockRejectedValueOnce(new Error("busy"));
+    const { companyId: created } = await onboarding().saveConfig({ companyName: "Deskly", ...brief });
+    expect(await db.company.findUnique({ where: { id: created } })).not.toBeNull();
+  });
+});
 
 describe("what counts as relevant", () => {
   it("means the same on the dashboard and the sidebar, and held posts count on their own", async () => {
