@@ -87,3 +87,7 @@ Searches and profiles are the largest costs. Jev and OpenAI prices were not re-c
 4. **Login and database migrations:** needed before the app leaves a private network.
 5. **Dependency upgrades:** `npm audit` reports issues in Next.js 15 and Zod 3 that need major upgrades.
 6. **Comments:** monitor them, since they often hold the most useful feedback.
+7. **API key rotation:** switch to another key when one hits a rate limit, so searches finish faster. First check that the provider's terms allow this.
+8. **Customer history:** on the post detail page, use a larger AI model to gather more details and review the author's older posts. Pass that history to the classifier so it can see the customer's journey, then measure whether accuracy improves. Storing a person's history needs a privacy review.
+9. **Today's summary:** in the filters, use AI to summarize today's posts and show what people are saying about the company.
+10. **More Reddit coverage:** add more types of search and other ways of collecting from Reddit, so fewer posts are missed.
