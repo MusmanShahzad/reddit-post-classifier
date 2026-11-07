@@ -34,9 +34,9 @@ describe("the public demo database", () => {
     expect(diff.status).toBe(0);
   }, 30_000);
 
-  it("cannot spend credits or leave work to resume on a fresh clone", async () => {
+  it("has the scheduler on, but its sessions stay out of it and leave no work to resume", async () => {
     const settings = await db.appSettings.findFirst();
-    expect(settings?.autoCollectEnabled).toBe(false);
+    expect(settings?.autoCollectEnabled).toBe(true);
     expect(settings?.authorLookupsEnabled).toBe(false);
     expect(await db.company.count({ where: { NOT: { autoCollect: false } } })).toBe(0);
     expect(await db.collectionRun.count({ where: { status: { in: ["queued", "running"] } } })).toBe(0);

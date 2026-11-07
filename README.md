@@ -52,7 +52,7 @@ npm start
 
 **A fresh clone opens with demo data.** The first `npm run db:push` copies `prisma/demo.db` to `prisma/dev.db`, so you can see the test sessions, their posts and the search results straight away. It never replaces an existing `prisma/dev.db`. Raw Reddit data and contact details are removed from the demo data. To start empty instead, set `DATABASE_URL="file:./fresh.db"` in `.env` before running it.
 
-**Automatic collection is off in the demo data,** so nothing spends credits until you choose. Turn on **Collect automatically** in Settings when you want scheduled runs.
+**The scheduler is on, but the demo sessions are not part of it,** so they spend nothing until you press **Run collection** on one. A session you create joins the schedule straight away.
 
 ### 4. Set up what to track
 
@@ -64,7 +64,7 @@ npm start
 
 There are three ways, and you only need one:
 
-- **Do nothing,** if **Collect automatically** is on. Creating a session starts its first search straight away, and the schedule runs it every 30 minutes. You can change the interval in Settings.
+- **Do nothing.** Pressing **Start monitoring** starts the first run straight away, and the schedule then runs it every 30 minutes. The Dashboard counts down to the next run. You can change the interval in Settings.
 - **Press Run collection** on the Dashboard.
 - **Call the endpoint.** This runs the session that is open:
 
@@ -74,7 +74,7 @@ curl -X POST http://localhost:3000/api/collect
 
 Running it again does not create duplicates. Watch the progress on the Dashboard, then open **Feed** to filter posts by category and urgency, and mark them as handled or dismissed.
 
-**With Collect automatically on, a new session starts spending as soon as you create it.** To stop that, turn it off in Settings.
+**A new session starts spending as soon as you create it.** **Collect automatically** in Settings stops the scheduled runs that follow, but not the first run.
 
 ## What it costs
 

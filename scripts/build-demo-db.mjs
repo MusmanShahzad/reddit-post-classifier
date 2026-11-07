@@ -35,9 +35,10 @@ let masked = 0;
 
 await db.$executeRawUnsafe(`UPDATE "RedditPost" SET "rawJson" = ''`);
 await db.$executeRawUnsafe(`UPDATE "RedditAuthor" SET "rawJson" = ''`);
-// A clone must not spend its owner's credits until they turn collection on.
+// The scheduler is on, but only sessions created on the clone join it, so the
+// demo sessions never spend its owner's credits.
 await db.$executeRawUnsafe(`UPDATE "Company" SET "autoCollect" = 0`);
-await db.$executeRawUnsafe(`UPDATE "AppSettings" SET "autoCollectEnabled" = 0, "authorLookupsEnabled" = 0`);
+await db.$executeRawUnsafe(`UPDATE "AppSettings" SET "autoCollectEnabled" = 1, "authorLookupsEnabled" = 0`);
 
 for (const [table, columns] of Object.entries(WRITTEN_TEXT)) {
   const rows = await db.$queryRawUnsafe(`SELECT "id", ${columns.map((c) => `"${c}"`).join(", ")} FROM "${table}"`);

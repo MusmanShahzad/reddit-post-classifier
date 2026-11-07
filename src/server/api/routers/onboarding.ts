@@ -168,14 +168,11 @@ export const onboardingRouter = createTRPCRouter({
         return { companyId: company.id, queriesGenerated: allQueries.length };
       });
 
-      // The first search starts now, unless automatic collection is switched off.
+      // Starting a session asks for its first run, so it always starts now.
       // The session is already saved, so if this fails the schedule picks it up.
-      const settings = await ctx.db.appSettings.findUnique({ where: { id: "default" } });
-      if (settings?.autoCollectEnabled !== false) {
-        await enqueueCollection(ctx.db, saved.companyId).catch((error: unknown) => {
-          console.warn(`[setup] first search did not start: ${error instanceof Error ? error.message : "Unknown"}`);
-        });
-      }
+      await enqueueCollection(ctx.db, saved.companyId).catch((error: unknown) => {
+        console.warn(`[setup] first search did not start: ${error instanceof Error ? error.message : "Unknown"}`);
+      });
       return saved;
     }),
 

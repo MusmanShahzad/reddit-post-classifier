@@ -26,6 +26,20 @@ export const Idle: Story = {
   },
 };
 
+export const NextRunCountdown: Story = {
+  args: {
+    lastRun: {
+      status: "completed",
+      startedAt: new Date().toISOString(),
+      totalFetched: 240,
+      totalNew: 38,
+      totalRelevant: 12,
+    },
+    isCollecting: false,
+    schedule: { intervalMins: 30, nextRunAt: new Date(Date.now() + 12 * 60_000), queued: false, scheduled: true },
+  },
+};
+
 export const Collecting: Story = {
   args: {
     lastRun: {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Clock3, WifiOff } from "lucide-react";
 import { AnimatedNumber, AnimatedProgress, AnimatedText } from "@/components/atoms";
+import { countdown } from "@/lib/schedule";
 
 export interface LiveStatusProps {
   run?: {
@@ -21,14 +22,6 @@ export interface LiveStatusProps {
 }
 
 const FINISHED = new Set(["done", "failed"]);
-
-function countdown(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = String(total % 60).padStart(2, "0");
-  return hours > 0 ? `${hours}h ${String(minutes).padStart(2, "0")}m` : `${minutes}:${seconds}`;
-}
 
 /**
  * The live banner above every tab: what the run is doing right now, how far it

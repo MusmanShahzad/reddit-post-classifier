@@ -89,10 +89,10 @@ describe("the first search of a new session", () => {
     expect(enqueueCollection).toHaveBeenCalledWith(expect.anything(), created);
   });
 
-  it("does not start with automatic collection switched off", async () => {
+  it("still starts with automatic collection switched off, because the user asked for it", async () => {
     await settings().updateSettings({ autoCollectEnabled: false });
-    await onboarding().saveConfig({ companyName: "Deskly", ...brief });
-    expect(enqueueCollection).not.toHaveBeenCalled();
+    const { companyId: created } = await onboarding().saveConfig({ companyName: "Deskly", ...brief });
+    expect(enqueueCollection).toHaveBeenCalledWith(expect.anything(), created);
   });
 
   it("still saves the session if the search cannot start", async () => {
@@ -658,6 +658,18 @@ describe("sessions", () => {
 });
 
 describe("collector.getSchedule", () => {
+  it("knows whether the scheduler will run this session", async () => {
+    await db.company.update({ where: { id: companyId }, data: { autoCollect: true } });
+    expect((await collector().getSchedule()).scheduled).toBe(true);
+
+    await db.company.update({ where: { id: companyId }, data: { autoCollect: false } });
+    expect((await collector().getSchedule()).scheduled).toBe(false);
+
+    await db.company.update({ where: { id: companyId }, data: { autoCollect: true } });
+    await settings().updateSettings({ autoCollectEnabled: false });
+    expect((await collector().getSchedule()).scheduled).toBe(false);
+  });
+
   it("reports the cost of a run and respects the auto switch", async () => {
     const before = await collector().getSchedule();
     expect(before).toMatchObject({ autoCollectEnabled: true, searchesPerRun: 3, creditsPerRun: 24 });

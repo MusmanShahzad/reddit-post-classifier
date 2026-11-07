@@ -46,7 +46,7 @@ export const collectorRouter = createTRPCRouter({
     const companyId = await activeSessionId(ctx);
     const intervalMins = clampInterval(settings?.collectionIntervalMins);
 
-    const [last, queuedRun, queryRows] = await Promise.all([
+    const [last, queuedRun, queryRows, company] = await Promise.all([
       companyId
         ? ctx.db.collectionRun.findFirst({
             where: { companyId, status: { not: "queued" } },
@@ -59,15 +59,23 @@ export const collectorRouter = createTRPCRouter({
       companyId
         ? ctx.db.searchQuery.findMany({ where: { companyId, isActive: true } })
         : [],
+      companyId
+        ? ctx.db.company.findUnique({ where: { id: companyId }, select: { autoCollect: true } })
+        : null,
     ]);
 
+    const autoCollectEnabled = settings?.autoCollectEnabled !== false;
+    // The same rule the scheduler uses: an older session with no answer collects only while it is open.
+    const inSchedule = company?.autoCollect ?? companyId === settings?.activeCompanyId;
     const searchesPerRun = queriesForCollection(queryRows).selected.length;
     const creditsPerRun = searchesPerRun * CREDITS_PER_SEARCH;
     const runsPerDay = 1440 / intervalMins;
 
     return {
       intervalMins,
-      autoCollectEnabled: settings?.autoCollectEnabled !== false,
+      autoCollectEnabled,
+      /** Whether the scheduler will run this session by itself. */
+      scheduled: autoCollectEnabled && inSchedule && queryRows.length > 0,
       enabled: Boolean(settings?.isOnboardingComplete && companyId),
       queued: Boolean(queuedRun),
       nextRunAt: nextDueAt(last, intervalMins),

@@ -11,6 +11,15 @@ export function clampInterval(minutes: number | null | undefined): number {
   return Math.min(Math.round(minutes), MAX_INTERVAL_MINS);
 }
 
+/** Time left, as `12:05` or `1h 05m`. Never below zero. */
+export function countdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = String(total % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}h ${String(minutes).padStart(2, "0")}m` : `${minutes}:${seconds}`;
+}
+
 interface RunTimes {
   status: string;
   startedAt: Date;
