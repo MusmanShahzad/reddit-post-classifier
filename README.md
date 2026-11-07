@@ -2,19 +2,19 @@
 
 Radarr finds Reddit posts a company cares about, drops the noise, and shows what is worth acting on.
 
-1. **Set up a session.** Describe the company, what it sells and what to find. Radarr suggests competitors, topics and subreddits for you to check.
+1. **Set up a session.** Describe the company, what it sells, and what to find. Radarr suggests competitors, topics, and subreddits for you to check.
 2. **Collect.** Searches run on a schedule, or when you press the button. A post is never saved twice, and a dismissed post never comes back.
-3. **Classify.** Jev decides whether each post is relevant and labels its category, sentiment, urgency and audience. GPT-4o-mini writes a one-line reason for the posts that pass.
+3. **Classify.** Jev decides whether each post is relevant and labels its category, sentiment, urgency, and audience. GPT-4o-mini writes a one-line reason for each post that passes.
 4. **Act.** The feed updates live. Filter it, open a post to see its author and their other posts, then mark it handled or dismiss it.
 
 ## Quick start
 
-You need **Node.js 22.15 or newer**, which the Jev client requires, and three API keys.
+You need **Node.js 22.15 or newer**(required by the Jev client) and three API keys.
 
 ### 1. Install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/MusmanShahzad/reddit-post-classifier.git
 cd reditt-post-classifier
 npm install
 cp .env.example .env
@@ -27,7 +27,7 @@ On Windows Command Prompt, use `copy .env.example .env` for the last line.
 Paste each one into `.env`, after the `=` on its line.
 
 **`SCRAPEBADGER_API_KEY`**, which fetches Reddit posts:
-1. Sign up at [scrapebadger.com/auth/signup](https://scrapebadger.com/auth/signup). No credit card is needed, and signup includes free credits.
+1. Sign up at [scrapebadger.com/auth/signup](https://scrapebadger.com/auth/signup). No credit card is needed, and sign-up includes free credits.
 2. Open [the API keys page](https://scrapebadger.com/dashboard/api-keys) and create a key.
 
 **`TYPESAFE_API_KEY`**, for Jev, which filters and labels posts:
@@ -39,7 +39,7 @@ Paste each one into `.env`, after the `=` on its line.
 2. Click **Create new secret key**.
 3. Make sure the account has billing credit.
 
-Every other value in `.env.example` works as it is. The Reddit client ID and secret are only for the optional official API.
+All other values in `.env.example` work as-is. The Reddit client ID and secret are only for the optional official API.
 
 ### 3. Start the app
 
@@ -54,14 +54,14 @@ Open [http://localhost:3000](http://localhost:3000). For development, use `npm r
 ### 4. Set up what to track
 
 1. Enter the company name, what it sells, and what to find. Press **Continue**.
-2. On the review screen, check the brand's other names, competitors, topics and subreddits. Remove anything that does not fit, or add what is missing. You can change all of these later in Settings, including other names for competitors.
+2. On the review screen, check the brand's other names, competitors, topics, and subreddits. Remove anything that does not fit, or add what is missing. You can change all of these later in Settings, including competitor names.
 3. Press **Start monitoring**.
 
 ### 5. Trigger a collection run
 
 There are three ways, and you only need one:
 
-- **Do nothing.** Creating a session starts its first search straight away, and the schedule then runs it every 30 minutes. You can change the interval in Settings.
+- **Do nothing.** Creating a session starts its first search straight away, and the schedule runs it every 30 minutes. You can change the interval in Settings.
 - **Press Run collection** on the Dashboard.
 - **Call the endpoint.** This runs the session that is open:
 
@@ -69,7 +69,7 @@ There are three ways, and you only need one:
 curl -X POST http://localhost:3000/api/collect
 ```
 
-Running it again does not create duplicates. Watch the progress on the Dashboard, then open **Feed** to filter posts by category and urgency, and mark them handled or dismissed.
+Running it again does not create duplicates. Watch the progress on the Dashboard, then open **Feed** to filter posts by category and urgency, and mark them as handled or dismissed.
 
 **A new session starts spending as soon as you create it.** To stop that, turn off **Collect automatically** in Settings.
 
@@ -79,19 +79,19 @@ ScrapeBadger charges **8 credits per search that returns posts**, nothing for a 
 
 - Raise the minutes between runs, or turn off **Collect automatically**.
 - Turn off **Include this session in the schedule** for sessions you only check now and then.
-- Turn off **Look up author profiles**, or lower the limit per run. Posts then show the username with no picture.
+- Turn off **Look up author profiles**, or lower the limit per run. Posts will then show the username without a picture.
 
 See [DECISIONS.md](./DECISIONS.md) for the full breakdown.
 
 ## Running it in production
 
 - **It needs one long-running server.** The scheduler and the worker live in the app's process, and the database is a SQLite file. It will not work on serverless hosting, and you should not run two copies against one database. Use a VM or a container with a persistent disk.
-- **Put login in front of it.** The app has no accounts, so anyone who can reach it can read posts, delete sessions and spend your credits. Keep it on a private network or behind an authenticating proxy.
+- **Put login in front of it.** The app has no accounts, so anyone who can reach it can read posts, delete sessions, and spend your credits. Keep it on a private network or behind an authenticating proxy.
 - **Back up the database.** All your data is in the file `DATABASE_URL` points to. Point it at the persistent disk, using an absolute path.
 - **Monitor `/api/health`.** It answers 200 when the database and the scheduler are working, and 503 when they are not.
 - **After upgrading,** run `npm run db:push` to apply schema changes, then rebuild and restart. New columns are safe to add. Read Prisma's warnings if it reports anything else.
 
-A restart is safe at any time. Finished searches are not fetched or paid for again, and a rate-limit wait carries on where it stopped.
+A restart is safe at any time. Finished searches aren't fetched or paid for again, and a rate-limit wait resumes where it left off.
 
 ## Tests
 
@@ -102,7 +102,7 @@ npm run typecheck
 ```
 
 - `npm test` runs the unit and database tests. It needs no keys and spends nothing.
-- `npm run eval` measures the filter against a file of labelled posts, using real Jev calls, so it needs your key. See `DECISIONS.md` for the results and the file's location.
+- `npm run eval` measures the filter against a file of labeled posts, using real Jev calls, so it needs your key. See `DECISIONS.md` for the results and the file's location.
 - `npm run test:e2e` builds the app and drives the production build in a real browser, including the real scheduler. It takes about 5 minutes and spends nothing, because ScrapeBadger, Jev and OpenAI are local stand-ins. If Chromium is missing, run `npx playwright install chromium`. Screenshots go to `e2e-artifacts/`.
 
 ## How it is built
