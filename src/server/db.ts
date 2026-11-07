@@ -1,8 +1,10 @@
 import { env } from "@/env";
 import { PrismaClient } from "@generated/prisma";
+import { databaseUrl } from "@/lib/database-url";
 
 const createPrismaClient = () =>
   new PrismaClient({
+    datasourceUrl: databaseUrl(),
     log:
       env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });

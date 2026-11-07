@@ -1,9 +1,10 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
+import { DEFAULT_DATABASE_URL } from "./lib/database-url.js";
 
 export const env = createEnv({
   server: {
-    DATABASE_URL: z.string(),
+    DATABASE_URL: z.string().default(DEFAULT_DATABASE_URL),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),

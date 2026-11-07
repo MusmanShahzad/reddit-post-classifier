@@ -9,7 +9,7 @@ Radarr finds Reddit posts a company cares about, drops the noise, and shows what
 
 ## Quick start
 
-You need **Node.js 22.15 or newer**(required by the Jev client) and three API keys.
+You need **Node.js 22.15 or newer** (required by the Jev client) and three API keys. The tested version is in `.nvmrc`. With [nvm](https://github.com/nvm-sh/nvm), run `nvm install` and then `nvm use` inside the project folder. With nvm for Windows, run `nvm install 24.12.0` and then `nvm use 24.12.0`.
 
 ### 1. Install
 
@@ -39,17 +39,16 @@ Paste each one into `.env`, after the `=` on its line.
 2. Click **Create new secret key**.
 3. Make sure the account has billing credit.
 
-All other values in `.env.example` work as-is. The Reddit client ID and secret are only for the optional official API.
+All other values in `.env.example` work as-is. If `DATABASE_URL` is missing or blank, the app uses `file:./dev.db`. The Reddit client ID and secret are only for the optional official API.
 
 ### 3. Start the app
 
 ```bash
 npm run db:push
-npm run build
 npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000). For development, use `npm run dev` instead of `build` and `start`.
+`npm start` builds the app first when there is no build or the code has changed, which takes a minute or two. Open [http://localhost:3000](http://localhost:3000) once it says it is ready. For development, use `npm run dev` instead of `npm start`.
 
 ### 4. Set up what to track
 
@@ -89,7 +88,7 @@ See [DECISIONS.md](./DECISIONS.md) for the full breakdown.
 - **Put login in front of it.** The app has no accounts, so anyone who can reach it can read posts, delete sessions, and spend your credits. Keep it on a private network or behind an authenticating proxy.
 - **Back up the database.** All your data is in the file `DATABASE_URL` points to. Point it at the persistent disk, using an absolute path.
 - **Monitor `/api/health`.** It answers 200 when the database and the scheduler are working, and 503 when they are not.
-- **After upgrading,** run `npm run db:push` to apply schema changes, then rebuild and restart. New columns are safe to add. Read Prisma's warnings if it reports anything else.
+- **After upgrading,** run `npm run db:push` to apply schema changes, then restart with `npm start`, which rebuilds the app. New columns are safe to add. Read Prisma's warnings if it reports anything else.
 
 A restart is safe at any time. Finished searches aren't fetched or paid for again, and a rate-limit wait resumes where it left off.
 
