@@ -23,7 +23,7 @@ We froze the filter and tested it on posts it had never seen, from eight markets
 - An AI assistant labelled the posts and also helped build the filter, so this is not an independent test. It locked the labels before scoring, and the filter was not changed afterwards.
 - To reach 150 posts, the test also searched the past month and year. Scheduled runs search the past week.
 
-`npm run eval` reruns the measurement on your own labelled file, set with `EVAL_FILE`. The test posts are not in this repo, because they include personal details.
+`npm run eval` reruns the measurement on your own labelled file, set with `EVAL_FILE`. The repo includes the test sessions as demo data, with raw Reddit data and contact details removed. The labels are not in the repo.
 
 ## Where the filter fails
 

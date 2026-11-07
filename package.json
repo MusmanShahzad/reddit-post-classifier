@@ -9,6 +9,7 @@
     "db:migrate": "node scripts/prisma.mjs migrate deploy",
     "db:push": "node scripts/prisma.mjs db push",
     "db:studio": "node scripts/prisma.mjs studio",
+    "db:demo": "node scripts/build-demo-db.mjs",
     "dev": "next dev",
     "postinstall": "prisma generate",
     "preview": "next build && next start",

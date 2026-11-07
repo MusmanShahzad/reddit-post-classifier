@@ -50,9 +50,13 @@ npm start
 
 `npm start` builds the app first when there is no build or the code has changed, which takes a minute or two. Open [http://localhost:3000](http://localhost:3000) once it says it is ready. For development, use `npm run dev` instead of `npm start`.
 
+**A fresh clone opens with demo data.** The first `npm run db:push` copies `prisma/demo.db` to `prisma/dev.db`, so you can see the test sessions, their posts and the search results straight away. It never replaces an existing `prisma/dev.db`. Raw Reddit data and contact details are removed from the demo data. To start empty instead, set `DATABASE_URL="file:./fresh.db"` in `.env` before running it.
+
+**Automatic collection is off in the demo data,** so nothing spends credits until you choose. Turn on **Collect automatically** in Settings when you want scheduled runs.
+
 ### 4. Set up what to track
 
-1. Enter the company name, what it sells, and what to find. Press **Continue**.
+1. Press **New** in the sidebar if the app opens on the demo data. Enter the company name, what it sells, and what to find. Press **Continue**.
 2. On the review screen, check the brand's other names, competitors, topics, and subreddits. Remove anything that does not fit, or add what is missing. You can change all of these later in Settings, including competitor names.
 3. Press **Start monitoring**.
 
@@ -60,7 +64,7 @@ npm start
 
 There are three ways, and you only need one:
 
-- **Do nothing.** Creating a session starts its first search straight away, and the schedule runs it every 30 minutes. You can change the interval in Settings.
+- **Do nothing,** if **Collect automatically** is on. Creating a session starts its first search straight away, and the schedule runs it every 30 minutes. You can change the interval in Settings.
 - **Press Run collection** on the Dashboard.
 - **Call the endpoint.** This runs the session that is open:
 
@@ -70,7 +74,7 @@ curl -X POST http://localhost:3000/api/collect
 
 Running it again does not create duplicates. Watch the progress on the Dashboard, then open **Feed** to filter posts by category and urgency, and mark them as handled or dismissed.
 
-**A new session starts spending as soon as you create it.** To stop that, turn off **Collect automatically** in Settings.
+**With Collect automatically on, a new session starts spending as soon as you create it.** To stop that, turn it off in Settings.
 
 ## What it costs
 
